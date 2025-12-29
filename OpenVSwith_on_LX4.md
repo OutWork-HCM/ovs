@@ -1,3 +1,62 @@
+#### REF
+[NVIDIA MLNX_OFED Documentation Rev 5.3-1.0.0.1](https://docs.nvidia.com/networking/display/mlnxofedv531001/ovs+offload+using+asap%C2%B2+direct#)
+
+[OVS-Kernel SR-IOV Based Supported Operating Systems](https://docs.nvidia.com/networking/display/mlnxenv581011/general+support#src-99404587_GeneralSupport-OVS-KernelSR-IOVBasedSupportedOperatingSystems)
+
+[OVS-DPDK SR-IOV Based Supported OSs](https://docs.nvidia.com/networking/display/mlnxenv581011/general+support#src-99404587_GeneralSupport-OVS-DPDKSR-IOVBasedSupportedOSs)
+
+[ASAP2 Requirements](https://docs.nvidia.com/networking/display/mlnxenv581011/general+support#src-99404587_GeneralSupport-ASAP2Requirements)
+
+[Supported NIC Firmware Versions](https://docs.nvidia.com/networking/display/mlnxenv581011/general+support#src-99404587_GeneralSupport-SupportedNICFirmwareVersions)
+
+[Mellanox Adapters - Comparison Table](https://enterprise-support.nvidia.com/s/article/mellanox-adapters---comparison-table)
+
+[Lets understand the openvswitch hardware offload!](https://hareshkhandelwal.blog/2020/03/11/lets-understand-the-openvswitch-hardware-offload/)
+
+[Firmware Support and Downloads - Identifying Adapter Cards](https://network.nvidia.com/support/firmware/identification/)
+
+```yaml
+linux@tester03:~$ sudo -i
+[sudo] password for linux:       
+root@tester03:~# 
+root@tester03:~# flint -d /dev/m
+mapper/ mcelog  mei0    mem     mqueue/ mtd0    mtd0ro  
+root@tester03:~# mst start        
+Starting MST (Mellanox Software Tools) driver set
+Loading MST PCI module - Success
+Loading MST PCI configuration module - Success
+Create devices
+Unloading MST PCI module (unused) - Success
+root@tester03:~# mst status
+MST modules:
+------------
+    MST PCI module is not loaded
+    MST PCI configuration module loaded
+
+MST devices:
+------------
+/dev/mst/mt4117_pciconf0         - PCI configuration cycles access.
+                                   domain:bus:dev.fn=0000:01:00.0 addr.reg=88 data.reg=92 cr_bar.gw_offset=-1
+                                   Chip revision is: 00
+
+root@tester03:~# flint -d /dev/mst/mt4117_pciconf0 q
+Image type:            FS3
+FW Version:            14.18.2030
+FW Release Date:       20.4.2017
+Product Version:       rel-14_18_2030
+Rom Info:              type=UEFI version=14.12.27 cpu=AMD64
+                       type=PXE version=3.5.110
+Description:           UID                GuidsNumber
+Base GUID:             9cdc71ffff556630        16
+Base MAC:              9cdc71556630            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  HP_2420110034
+Security Attributes:   N/A
+```
+
+[Online Firmware Upgrade Utility (Linux x86_64) for HPE Mellanox Ethernet only adapters](https://support.hpe.com/connect/s/softwaredetails?language=en_US&collectionId=MTX-5c045315a07d4577&tab=releaseNotes)
+
 
 Our NIC
 ```bash
