@@ -20,7 +20,12 @@ function run_test() {
     sar 1 $DURATION | grep "Average" | awk '{print "Average CPU Idle: "$8"%"}' &
     
     # Run iperf3 client
-    ip netns exec $NS_CLIENT iperf3 -c $SERVER_IP -t $DURATION -P 32 | grep "receiver"
+    # -u: upd                                                                                                                 │
+    # -l 64: Packet size 64                                                                                                   │
+    # -b 0: unlimited bandwidth                                                                                               │
+    # -P 64: Paralle 64 flows                                                                                                 │
+    # -t 30: 30s runtime                                                                                                      │
+    ip netns exec $NS_CLIENT iperf3 -c $SERVER_IP -u -l 64 -b 0 -t $DURATION -P 64 | grep "receiver"
     
     echo "------------------------------------------------"
 }

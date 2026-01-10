@@ -226,6 +226,43 @@ ufid:04682cbb-cb41-4082-b446-773f3e563607, skb_priority(0/0),skb_mark(0/0),ct_st
 ufid:5a9f8083-62b7-4af9-9174-26cda5348487, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f1npf1vf0),packet_type(ns=0/0,id=0/0),eth(src=3a:fb:88:a5:c4:5d,dst=9e:f3:7d:50:bb:1b),eth_type(0x0806),arp(sip=0.0.0.0/0.0.0.0,tip=0.0.0.0/0.0.0.0,op=0/0,sha=00:00:00:00:00:00/00:00:00:00:00:00,tha=00:00:00:00:00:00/00:00:00:00:00:00), packets:1, bytes:46, used:never, dp:tc, actions:enp1s0f0npf0vf0
 ```
 
+# 2026-01-10
+### iperf3 benchmark - OVS offload on/off Report
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_offload.sh
+>>> Running Benchmark in mode: OFFLOAD ON (dp:tc)
+Average CPU Idle: 88,84% 
+[SUM]   0.00-30.02  sec  2.60 GBytes   744 Mbits/sec  0.050 ms  219961/43824509 (0.5%)  receiver
+------------------------------------------------
+>>> Running Benchmark in mode: OFFLOAD OFF (dp:ovs)
+Average CPU Idle: 87,29%
+[SUM]   0.00-30.02  sec  2.59 GBytes   741 Mbits/sec  0.055 ms  3852641/47316817 (8.1%)  receiver
+```
+
+- ***Note***: iperf3 with following command:
+```bash
+iperf3 -c <server_ip> -u -l 64 -b 0 -t 30 -P 64
+```
+
+| Mode      | Throughput (Mbits/sec) | CPU Idle (%) | Packet Loss (%) | Delay (ms) |
+|-----------|------------------------|--------------|-----------------|------------|
+| OFFLOAD ON| 744                    | 88.84        | 0.5             | 0.050      |
+| OFFLOAD OFF| 741                   | 87.29        | 8.1             | 0.055      |
+- **Conclusion**: With offload enabled, we achieved slightly higher throughput, significantly lower packet loss, and marginally reduced delay, all while maintaining better CPU idle percentages. This indicates that enabling offload improves overall network performance and efficiency in this setup.
+
+- Some of useful commands to verify OVS offload status and statistics:
+```yaml
+watch -n 1 "cat /proc/interrupts | grep mlx5"
+watch -n 1 "ovs-appctl dpctl/dump-flows -m type=tc"
+watch -n 1 "ovs-appctl dpctl/dump-flows -m type=ovs"
+ip netns exec ns0 watch -n 1 cat /proc/net/pktgen/enp1s0f0v0
+watch -n 1 "ovs-vsctl get Open_vSwitch . other_config"
+```
+
+
+
+
 
 
 
