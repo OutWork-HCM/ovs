@@ -260,6 +260,76 @@ ip netns exec ns0 watch -n 1 cat /proc/net/pktgen/enp1s0f0v0
 watch -n 1 "ovs-vsctl get Open_vSwitch . other_config"
 ```
 
+# 2026-01-12
+### Bad news - OVS offload with ConnectX-4 LX is not actually working.
+
+After further investigation and testing, it has been determined that the OVS offload feature is not functioning as expected with the Mellanox ConnectX-4 LX network interface cards. Despite enabling hardware offloading in Open vSwitch and configuring the system for switchdev mode, the expected performance improvements and offloading behaviors are not being realized.
+We checked with some log files and found the offload function is not activated.
+```yaml
+root@tester03:~# tc -stats filter show dev enp1s0f1npf1vf0 ingress 
+filter protocol ip pref 2 flower chain 0 
+filter protocol ip pref 2 flower chain 0 handle 0x1 
+  dst_mac 9e:f3:7d:50:bb:1b
+  src_mac 7a:77:ee:80:f0:c5
+  eth_type ipv4
+  ip_flags nofrag
+  not_in_hw
+        action order 1: mirred (Egress Redirect to device enp1s0f0npf0vf0) stolen
+        index 4 ref 1 bind 1 installed 5 sec used 5 sec firstused 5 sec
+        Action statistics:
+        Sent 3260 bytes 70 pkt (dropped 0, overlimits 0 requeues 0) 
+        backlog 0b 0p requeues 0
+        cookie 497693cbd8498f9aca704e8b2a9a464d
+        no_percpu
+
+filter protocol arp pref 4 flower chain 0 
+filter protocol arp pref 4 flower chain 0 handle 0x1 
+  dst_mac 9e:f3:7d:50:bb:1b
+  src_mac 7a:77:ee:80:f0:c5
+  eth_type arp
+  not_in_hw
+        action order 1: mirred (Egress Redirect to device enp1s0f0npf0vf0) stolen
+        index 13 ref 1 bind 1 installed 0 sec used 0 sec
+        Action statistics:
+        Sent 0 bytes 0 pkt (dropped 0, overlimits 0 requeues 0) 
+        backlog 0b 0p requeues 0
+        cookie 92b3dd11f24234c8ab0a9ca851531da9
+        no_percpu
+```
+
+We checked all configurations and verified that the hardware and software settings are correct. However, the offload functionality does not appear to be activated, as indicated by the "not_in_hw" status in the traffic control (tc) filter output.
+
+```yaml
+root@tester03:~# ethtool -k enp1s0f1npf1vf0 | grep hw-tc-offload
+hw-tc-offload: on
+```
+
+```yaml
+root@tester03:~# ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000", max-revalidator="10000", n-handler-threads="4", n-revalidator-threads="4"}
+```
+
+```yaml
+root@tester03:~# devlink dev eswitch show pci/0000:01:00.0 
+pci/0000:01:00.0: mode switchdev inline-mode link encap-mode basic
+```
+
+```yaml
+root@tester03:~# ethtool -i enp1s0f0np0
+driver: mlx5_core
+version: 24.10-3.2.5
+firmware-version: 14.32.1010 (HP_2420110034)
+expansion-rom-version: 
+bus-info: 0000:01:00.0
+supports-statistics: yes
+supports-test: yes
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: yes
+```
+
+We will continue to investigate the issue and work towards a solution.
+
 
 
 
