@@ -330,12 +330,156 @@ supports-priv-flags: yes
 
 We will continue to investigate the issue and work towards a solution.
 
+# 2026-01-13
+### Follow-up on OVS offload with ConnectX-4 LX
 
+Today, we tried upgrading the firmware and driver of the Mellanox ConnectX-4 LX NICs to see if that would resolve the offload issue. However, after performing the upgrades, we found that the problem persists.
 
+```yaml
+linux@tester03:~$ sudo flint -d /dev/mst/mt4117_pciconf0 q full
+Image type:            FS3
+FW Version:            14.32.1908
+FW Release Date:       17.8.2025
+Part Number:           817753-B21_Ax
+Description:           HPE Ethernet 10/25Gb 2-port 640SFP28 Adapter
+Product Version:       14.32.1908
+Rom Info:              type=UEFI version=14.25.17 cpu=AMD64
+                       type=PXE version=3.6.502 cpu=AMD64
+Description:           UID                GuidsNumber
+Base GUID:             9440c9ffffc367fa        16
+Base MAC:              9440c9c367fa            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  HP_2420110034
+Security Attributes:   N/A
+Default Update Method: fw_ctrl
+```
 
+Check with on kernel driver version:
+```yaml
+root@tester03:/home/linux/vinhhuynh# ethtool -i enp1s0f0np0 
+driver: mlx5_core
+version: 6.5.0-14-generic
+firmware-version: 14.32.1908 (HP_2420110034)
+expansion-rom-version: 
+bus-info: 0000:01:00.0
+supports-statistics: yes
+supports-test: yes
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: yes
+```
 
+- Configuration checked
+```yaml
+root@tester03:/home/linux/vinhhuynh# ethtool -k enp1s0f
+enp1s0f0np0      enp1s0f0npf0vf0  enp1s0f1np1      enp1s0f1npf1vf0  
+root@tester03:/home/linux/vinhhuynh# ethtool -k enp1s0f1npf1vf0 | grep hw-tc-offload
+hw-tc-offload: on
+root@tester03:/home/linux/vinhhuynh# ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000", max-revalidator="10000", n-handler-threads="4", n-revalidator-threads="4"}
+root@tester03:/home/linux/vinhhuynh# devlink dev eswitch show pci/0000:01:00.0
+pci/0000:01:00.0: mode switchdev inline-mode link encap-mode basic
+```
+- tc filter still shows offload is not active
+```yaml
+root@tester03:~# tc filter show dev enp1s0f1npf1vf0 ingress
+filter protocol ip pref 3 flower chain 0 
+filter protocol ip pref 3 flower chain 0 handle 0x1 
+  dst_mac 9e:f3:7d:50:bb:1b
+  src_mac 5e:2a:fd:cc:7e:59
+  eth_type ipv4
+  ip_flags nofrag
+  not_in_hw
+        action order 1: mirred (Egress Redirect to device enp1s0f0npf0vf0) stolen
+        index 4 ref 1 bind 1
+        cookie f14014898849b7c13348c792e546283f
+        no_percpu
 
+filter protocol arp pref 4 flower chain 0 
+filter protocol arp pref 4 flower chain 0 handle 0x1 
+  dst_mac 9e:f3:7d:50:bb:1b
+  src_mac 5e:2a:fd:cc:7e:59
+  eth_type arp
+  not_in_hw
+        action order 1: mirred (Egress Redirect to device enp1s0f0npf0vf0) stolen
+        index 2 ref 1 bind 1
+        cookie 691e42d08f45834b36525f8dfc6b114f
+        no_percpu
+```
 
+```yaml
+root@tester03:~# ovs-appctl dpctl/dump-flows -m type=offloaded
+
+root@tester03:~# ovs-appctl dpctl/dump-flows -m type=non-offloaded
+
+ufid:0d9c0633-8a17-4abb-a965-b8b0af9ee4ed, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0npf0vf0),packet_type(ns=0/0,id=0/0),eth(src=9e:f3:7d:50:bb:1b,dst=5e:2a:fd:cc:7e:59),eth_type(0x0800),ipv4(src=0.0.0.0/0.0.0.0,dst=0.0.0.0/0.0.0.0,proto=0/0,tos=0/0,ttl=0/0,frag=no), packets:163, bytes:13692, used:0.570s, dp:tc, actions:enp1s0f1npf1vf0
+ufid:4a376bec-6d82-4b2e-acab-ff7aa1d069b6, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0npf0vf0),packet_type(ns=0/0,id=0/0),eth(src=9e:f3:7d:50:bb:1b,dst=5e:2a:fd:cc:7e:59),eth_type(0x0806),arp(sip=0.0.0.0/0.0.0.0,tip=0.0.0.0/0.0.0.0,op=0/0,sha=00:00:00:00:00:00/00:00:00:00:00:00,tha=00:00:00:00:00:00/00:00:00:00:00:00), packets:9, bytes:414, used:1.660s, dp:tc, actions:enp1s0f1npf1vf0
+ufid:c442c614-d1a5-4058-b799-06a53eedff5c, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0np0),packet_type(ns=0/0,id=0/0),eth(src=94:40:c9:c3:67:fb,dst=ff:ff:ff:ff:ff:ff),eth_type(0x0800),ipv4(src=0.0.0.0/0.0.0.0,dst=0.0.0.0/0.0.0.0,proto=0/0,tos=0/0,ttl=0/0,frag=no), packets:8, bytes:2512, used:15.470s, dp:tc, actions:ovs-sriov,enp1s0f0npf0vf0,enp1s0f1npf1vf0
+ufid:0fcf6352-9136-476e-9632-9414e332ad57, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0np0),packet_type(ns=0/0,id=0/0),eth(src=94:40:c9:c3:67:fb,dst=33:33:00:00:00:16),eth_type(0x86dd),ipv6(src=::/::,dst=::/::,label=0/0,proto=0/0,tclass=0/0,hlimit=0/0,frag=no), packets:4, bytes:384, used:28.600s, dp:tc, actions:ovs-sriov,enp1s0f0npf0vf0,enp1s0f1npf1vf0
+ufid:ecb99242-585b-4420-8abe-78892d27ddc1, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0np0),packet_type(ns=0/0,id=0/0),eth(src=94:40:c9:c3:67:fb,dst=33:33:ff:85:68:0e),eth_type(0x86dd),ipv6(src=::/::,dst=::/::,label=0/0,proto=0/0,tclass=0/0,hlimit=0/0,frag=no), packets:0, bytes:0, used:never, dp:tc, actions:ovs-sriov,enp1s0f0npf0vf0,enp1s0f1npf1vf0
+ufid:e7b2e3eb-640a-46dd-94b7-5f2212541204, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0np0),packet_type(ns=0/0,id=0/0),eth(src=94:40:c9:c3:67:fb,dst=33:33:00:00:00:02),eth_type(0x86dd),ipv6(src=::/::,dst=::/::,label=0/0,proto=0/0,tclass=0/0,hlimit=0/0,frag=no), packets:7, bytes:336, used:3.760s, dp:tc, actions:ovs-sriov,enp1s0f0npf0vf0,enp1s0f1npf1vf0
+ufid:0d0f558a-1cac-4e9e-b9a7-7e11f27ad9a5, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f0np0),packet_type(ns=0/0,id=0/0),eth(src=94:40:c9:c3:67:fb,dst=33:33:00:00:00:fb),eth_type(0x86dd),ipv6(src=::/::,dst=::/::,label=0/0,proto=0/0,tclass=0/0,hlimit=0/0,frag=no), packets:11, bytes:1308, used:0.090s, dp:tc, actions:ovs-sriov,enp1s0f0npf0vf0,enp1s0f1npf1vf0
+ufid:891440f1-c1b7-4988-92c7-48333f2846e5, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f1npf1vf0),packet_type(ns=0/0,id=0/0),eth(src=5e:2a:fd:cc:7e:59,dst=9e:f3:7d:50:bb:1b),eth_type(0x0800),ipv4(src=0.0.0.0/0.0.0.0,dst=0.0.0.0/0.0.0.0,proto=0/0,tos=0/0,ttl=0/0,frag=no), packets:163, bytes:13692, used:0.570s, dp:tc, actions:enp1s0f0npf0vf0
+ufid:d0421e69-4b83-458f-8d5f-52364f116bfc, skb_priority(0/0),skb_mark(0/0),ct_state(0/0),ct_zone(0/0),ct_mark(0/0),ct_label(0/0),recirc_id(0),dp_hash(0/0),in_port(enp1s0f1npf1vf0),packet_type(ns=0/0,id=0/0),eth(src=5e:2a:fd:cc:7e:59,dst=9e:f3:7d:50:bb:1b),eth_type(0x0806),arp(sip=0.0.0.0/0.0.0.0,tip=0.0.0.0/0.0.0.0,op=0/0,sha=00:00:00:00:00:00/00:00:00:00:00:00,tha=00:00:00:00:00:00/00:00:00:00:00:00), packets:9, bytes:414, used:1.660s, dp:tc, actions:enp1s0f0npf0vf0
+```
+
+Checked with MLNX_OFED version:
+```yaml
+root@tester03:~# ethtool -i enp1s0f0np0 
+driver: mlx5_core
+version: 24.10-3.2.5
+firmware-version: 14.32.1908 (HP_2420110034)
+expansion-rom-version: 
+bus-info: 0000:01:00.0
+supports-statistics: yes
+supports-test: yes
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: yes
+```
+
+# 2026-01-15
+### Next steps on OVS offload with ConnectX-4 LX
+
+Today, we did the following steps to further investigate the OVS offload issue with ConnectX-4 LX:
+- Reinstall OS with Linux Mint 21.3 (based on Ubuntu 22.04) edge version with Kernel 6.5.0-14-generic.
+- Flash the stock firmware version 14.32.1908 to NIC.
+We checked with both drivers - the default kernel driver and MLNX_OFED driver version 24.10-3.2.5 - but the offload issue still persists.
+
+```yaml
+flint -d /dev/mst/mt4117_pciconf0 q full
+Image type:            FS3
+FW Version:            14.32.1908
+FW Release Date:       17.8.2025
+Part Number:           MCX4121A-ACA_Ax
+Description:           ConnectX-4 Lx EN network interface card; 25GbE dual-port SFP28; PCIe3.0 x8; ROHS R6
+Product Version:       14.32.1908
+Rom Info:              type=UEFI version=14.25.17 cpu=AMD64,AARCH64
+                       type=PXE version=3.6.502 cpu=AMD64
+Description:           UID                GuidsNumber
+Base GUID:             9440c9ffffc367fa        16
+Base MAC:              9440c9c367fa            16
+Image VSD:             N/A
+Device VSD:            N/A
+PSID:                  MT_2420110034
+Security Attributes:   N/A
+Default Update Method: fw_ctrl
+```
+
+```yaml
+root@tester03:~# ethtool -i enp1s0f0np0 
+driver: mlx5_core
+version: 24.10-3.2.5
+firmware-version: 14.32.1908 (MT_2420110034)
+expansion-rom-version: 
+bus-info: 0000:01:00.0
+supports-statistics: yes
+supports-test: yes
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: yes
+```
 
 
 
