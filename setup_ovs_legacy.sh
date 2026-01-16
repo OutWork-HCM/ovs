@@ -29,10 +29,8 @@ tc qdisc del dev $PF1 ingress 2>/dev/null
 
 # 2. Enable Hardware TC Offload on Physical Interfaces
 echo ">>> Enabling hw-tc-offload on PFs..."
-ethtool -K $PF0 hw-tc-offload on 2>/dev/null
-ethtool -K $PF1 hw-tc-offload on 2>/dev/null
-# ethtool -K $PF0 rx-vlan-offload off tx-vlan-offload off 2>/dev/null
-# ethtool -K $PF1 rx-vlan-offload off tx-vlan-offload off 2>/dev/null
+ethtool -K $PF0 hw-tc-offload off 2>/dev/null
+ethtool -K $PF1 hw-tc-offload off 2>/dev/null
 
 # 3. Initialize SR-IOV VFs
 # Reset VFs to 0 first to ensure a clean state
@@ -43,15 +41,15 @@ sleep 1
 echo 1 > /sys/class/net/$PF0/device/sriov_numvfs
 echo 1 > /sys/class/net/$PF1/device/sriov_numvfs
 
-# 4. Configure "switchdev" mode
-echo ">>> Setting eswitch mode to switchdev..."
+# 4. Configure "eswitch" mode
+echo ">>> Setting eswitch mode to legacy..."
 # Unbind VFs before changing mode (Required for Mellanox ConnectX-4)
 echo $PCI_VF0 > /sys/bus/pci/drivers/mlx5_core/unbind 2>/dev/null
 echo $PCI_VF1 > /sys/bus/pci/drivers/mlx5_core/unbind 2>/dev/null
 
 # Set mode to switchdev
-devlink dev eswitch set pci/$PCI_PF0 mode switchdev
-devlink dev eswitch set pci/$PCI_PF1 mode switchdev
+# devlink dev eswitch set pci/$PCI_PF0 mode switchdev
+# devlink dev eswitch set pci/$PCI_PF1 mode switchdev
 
 # Bind VFs back to the driver
 echo $PCI_VF0 > /sys/bus/pci/drivers/mlx5_core/bind
@@ -61,7 +59,7 @@ echo $PCI_VF1 > /sys/bus/pci/drivers/mlx5_core/bind
 echo ">>> Configuring Open vSwitch..."
 systemctl start openvswitch-switch
 ovs-vsctl --no-wait add-br $BRIDGE
-ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
+ovs-vsctl remove Open_vSwitch . other_config hw-offload 2>/dev/null
 ovs-vsctl remove Open_vSwitch . other_config tc-policy 2>/dev/null
 
 # Tuning OVS parameters for better performance
@@ -124,8 +122,8 @@ PING_PID=$!
 # Wait for flows to be programmed into hardware
 sleep 3
 
-echo ">>> Datapath Flows (Filtering for 'type=tc' to confirm HW Offload):"
+echo ">>> Datapath Flows (Filtering for 'type=ovs' to confirm ovs):"
 # This command dumps flows offloaded to hardware via the TC subsystem
-ovs-appctl dpctl/dump-flows -m type=tc
+ovs-appctl dpctl/dump-flows -m type=ovs
 
 wait $PING_PID
