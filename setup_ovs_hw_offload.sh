@@ -13,9 +13,11 @@ PF1="enp1s0f1np1"        # Kept out of the bridge to avoid loops
 PCI_PF0="0000:01:00.0"
 PCI_PF1="0000:01:00.1"
 PCI_VF0="0000:01:00.2"
-PCI_VF1="0000:01:01.2"
+PCI_VF1="0000:01:00.3"
+PCI_VF2="0000:01:01.2"
 REP0="enp1s0f0npf0vf0"
-REP1="enp1s0f1npf1vf0"
+REP1="enp1s0f0npf0vf1"
+REP2="enp1s0f1npf1vf0"
 
 echo ">>> Starting OVS Hardware Offload Configuration..."
 
@@ -40,8 +42,12 @@ echo ">>> Initializing VFs..."
 echo 0 > /sys/class/net/$PF0/device/sriov_numvfs
 echo 0 > /sys/class/net/$PF1/device/sriov_numvfs
 sleep 1
-echo 1 > /sys/class/net/$PF0/device/sriov_numvfs
-echo 1 > /sys/class/net/$PF1/device/sriov_numvfs
+echo 2 > /sys/class/net/$PF0/device/sriov_numvfs
+#echo 1 > /sys/class/net/$PF1/device/sriov_numvfs
+
+# Provision the VF MAC addresses
+ip link set $PF0 vf 0 mac e4:11:22:33:44:50
+ip link set $PF0 vf 1 mac e4:11:22:33:44:51
 
 # 4. Configure "switchdev" mode
 echo ">>> Setting eswitch mode to switchdev..."
@@ -50,6 +56,14 @@ echo $PCI_VF0 > /sys/bus/pci/drivers/mlx5_core/unbind 2>/dev/null
 echo $PCI_VF1 > /sys/bus/pci/drivers/mlx5_core/unbind 2>/dev/null
 
 # Set mode to switchdev
+# Steering Mode
+devlink dev param set pci/$PCI_PF0 name flow_steering_mode value "smfs" cmode runtime
+devlink dev param set pci/$PCI_PF1 name flow_steering_mode value "smfs" cmode runtime
+
+# vPort Match Mode
+echo metadata > /sys/class/net/$PF0/compat/devlink/vport_match_mode
+echo metadata > /sys/class/net/$PF1/compat/devlink/vport_match_mode
+
 devlink dev eswitch set pci/$PCI_PF0 mode switchdev
 devlink dev eswitch set pci/$PCI_PF1 mode switchdev
 
