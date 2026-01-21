@@ -1162,3 +1162,8 @@ Connecting to host 192.168.50.10, port 5201
 ![CPU Utilization - Offload ON](./Pics/iperf_8flows_cpu.png)
 
 ![Results Summary - Offload ON](./Pics/iperf_8flows_results.png)
+
+***NOTE: Today we tested with iperf and using 1 server and 1 client, and have a strange issue with Retransmissions without reason.
+![CPU Utilization with 1 server and 1 client - Offload ON](./Pics/CPU_1Flow-20260121-180807.png)
+
+![Results Summary with 1 server and 1 client - Offload ON](./Pics/Results_1Flow-20260121-180829.png)
