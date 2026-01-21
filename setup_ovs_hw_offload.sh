@@ -82,8 +82,8 @@ ovs-vsctl remove Open_vSwitch . other_config tc-policy 2>/dev/null
 # Flow Aging and Thread Counts
 ovs-vsctl set Open_vSwitch . other_config:max-idle=30000
 ovs-vsctl set Open_vSwitch . other_config:max-revalidator=10000
-ovs-vsctl set Open_vSwitch . other_config:n-handler-threads=4
-ovs-vsctl set Open_vSwitch . other_config:n-revalidator-threads=4
+ovs-vsctl set Open_vSwitch . other_config:n-handler-threads=1
+ovs-vsctl set Open_vSwitch . other_config:n-revalidator-threads=1
 systemctl restart openvswitch-switch
 
 # 6. Add Ports to OVS Bridge

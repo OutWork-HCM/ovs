@@ -1134,3 +1134,31 @@ Connecting to host 192.168.50.10, port 5201
 |                        | Packet Loss %   | 0      | 0          | 0           |
 
 
+# 2026-01-21
+
+### Comparison of ethtool offload configuration (enp1s0f0np0)
+
+| Offload Feature | Before Setup | After Setup | Notes |
+| :--- | :--- | :--- | :--- |
+| tcp-segmentation-offload | on | on | - |
+| generic-segmentation-offload | on | on | - |
+| generic-receive-offload | on | on | - |
+| large-receive-offload | off | off | - |
+| **rx-vlan-offload** | **on** | **off requested on** | **Changed** |
+| tx-vlan-offload | on | on | - |
+| l2-fwd-offload | off fixed | off fixed | - |
+| **hw-tc-offload** | **off** | **on** | **Changed** |
+| esp-hw-offload | off fixed | off fixed | - |
+| esp-tx-csum-hw-offload | off fixed | off fixed | - |
+| rx-udp_tunnel-port-offload | on | on | - |
+| tls-hw-tx-offload | off fixed | off fixed | - |
+| tls-hw-rx-offload | off fixed | off fixed | - |
+| macsec-hw-offload | on | on | - |
+| hsr-tag-ins-offload | off fixed | off fixed | - |
+| hsr-tag-rm-offload | off fixed | off fixed | - |
+| hsr-fwd-offload | off fixed | off fixed | - |
+| hsr-dup-offload | off fixed | off fixed | - |
+
+![CPU Utilization - Offload ON](./Pics/iperf_8flows_cpu.png)
+
+![Results Summary - Offload ON](./Pics/iperf_8flows_results.png)
