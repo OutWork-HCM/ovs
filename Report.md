@@ -1168,3 +1168,70 @@ Connecting to host 192.168.50.10, port 5201
 ![CPU Utilization with 1 server and 1 client - Offload ON](./Pics/CPU_1Flow-20260121-180807.png)
 
 ![Results Summary with 1 server and 1 client - Offload ON](./Pics/Results_1Flow-20260121-180829.png)
+
+# 2026-01-22
+## Work with Intel E810 Card
+
+```yaml
+Product Name: Intel Eth Network Adapter E810-CQDA2
+Product Code: E810CQDA2G2P5
+PBA Number: K91258-010
+MAC Address: 6CFE5440C9C0
+Manufacturing Date: Week 22 2022
+```
+
+```yaml
+root@tester03:~# ethtool -i enp1s0f0np0 
+driver: ice
+version: 6.5.0-14-generic
+firmware-version: 2.50 0x800077a6 1.2960.0
+expansion-rom-version: 
+bus-info: 0000:01:00.0
+supports-statistics: yes
+supports-test: yes
+supports-eeprom-access: yes
+supports-register-dump: yes
+supports-priv-flags: yes
+```
+
+### 2 VFs on Tester03
+
+#### Cable Connection - Loopback on Port 0 of E810
+
+![Results Summary with 1 server and 1 client - Offload ON](./Pics/Intel810_2VFs_iperf_result_20260122_114003.jpg)
+
+![Results Summary with 1 server and 1 client - udp - ulimited bandwidth - Offload ON](./Pics/Intel810_2VFs_iperf_udp_b0_20260122_115217.png)
+
+![Results Summary with 1 server and 1 client - udp - 64B - 8 parallel - Offload ON](./Pics/Intel810_2VFs_iperf_udp_b0_P8_20260122_115353.png)
+
+### 16 VFs on tester03
+
+#### Cable Connection - Port 0 <-> Port 1 of E810 - All VFs are configured on PF0
+
+##### ovs hw-offload=true
+
+![Results Summary with 1 server and 1 client - Offload ON](./Pics/Intel810_2VFs_iperf_tcp_20260122_164708.png)
+
+![Results Summary with 2 server and 2 client - Offload ON](./Pics/Intel810_4VFs_iperf_tcp_20260122_164925.png)
+
+![Results Summary with 4 server and 4 client - Offload ON](./Pics/Intel810_8VFs_iperf_tcp_20260122_165210.png)
+
+![Results Summary with 8 server and 8 client - Offload ON](./Pics/Intel810_16VFs_iperf_tcp_20260122_165441.png)
+
+##### ovs hw-offload=false
+
+![Results Summary with 1 server and 1 client - Offload OFF](./Pics/Intel810_2VFs_OVS_iperf_tcp_20260122_172836.png)
+![Results Summary with 8 server and 8 client - Offload OFF](./Pics/Intel810_16VFs_OVS_iperf_tcp_20260122_172531.png)
+
+### Summary of Results - Intel E810
+| Number of VFs | Traffic Type           | Performance      | Retransmissions | Average CPU Idle  | hw-offload |
+|---------------|------------------------|-----------------|-----------------|-------------------|------------|
+| 2 VFs         | TCP (Default)          | 14.8 Gbps    | 335           | 93.90%               | OFF         |
+| 2 VFs         | TCP (Default)          | 39.3 Gbps    | 221445           | 91.90%               | ON          |
+| 4 VFs         | TCP (Default)          | 7.44 Gbps   | 321          | 93.87%               | OFF         |
+| 4 VFs         | TCP (Default)          | 29.3 Gbps    | 281481           | 83.20%               | ON          |
+| 8 VFs         | TCP (Default)          | 3.78 Gbps    | 1296          | 93.64%               | OFF         |
+| 8 VFs         | TCP (Default)          | 17.7 Gbps    | 165713           | 72.89%               | ON          |
+| 16 VFs        | TCP (Default)          | 1.89 Gbps    | 882          | 93.15%               | OFF         |
+| 16 VFs        | TCP (Default)          | 8.32 Gbps    | 43739           | 62.87%               | ON          |
+
