@@ -1235,3 +1235,95 @@ supports-priv-flags: yes
 | 16 VFs        | TCP (Default)          | 1.89 Gbps    | 882          | 93.15%               | OFF         |
 | 16 VFs        | TCP (Default)          | 8.32 Gbps    | 43739           | 62.87%               | ON          |
 
+# 2026-01-23
+
+## Continue Testing Intel E810 with OVS
+
+#### Cable Connection - Port 0 <-> Port 1 of E810 - All VFs are configured on PF0
+##### Using pktgen to generate traffic with 2 VFs
+
+```yaml
+root@tester03:/proc/net/pktgen# /home/linux/vinhhuynh/bench_ovs_with_pktgen.sh
+>>> Debug: Checking interfaces...
+In ns0:
+18: enp1s0f0v0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether e4:11:22:33:44:00 brd ff:ff:ff:ff:ff:ff
+In ns1:
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+38: enp1s0f0v1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+    link/ether e4:11:22:33:44:01 brd ff:ff:ff:ff:ff:ff
+>>> Setup Details:
+    Source Interface: enp1s0f0v0 (in ns0)
+    Target MAC:       e4:11:22:33:44:01 (in ns1)
+------------------------------------------------
+ >>> Testing with Hardware Offload ENABLED...
+ Current OVS other_config:
+{hw-offload="true", max-idle="30000"}
+>>> Starting Test: HW OFFLOAD ON (dp:tc)
+    Binding enp1s0f0v0 to pktgen thread...
+    Configuring pktgen parameters...
+    Current pktgen configuration:
+Params: count 0  min_pkt_size: 1500  max_pkt_size: 1500
+     src_mac: e4:11:22:33:44:00 dst_mac: e4:11:22:33:44:01
+     src_mac_count: 0  dst_mac_count: 0
+     cur_udp_dst: 0  cur_udp_src: 0
+    Starting traffic for 20 seconds...
+>>> Traffic is flowing. Waiting for 20 seconds...
+Average CPU Idle: 94,45%
+    Stopping traffic...
+>>> Statistics for HW OFFLOAD ON (dp:tc):
+     pkts-sofar: 196574759  errors: 0
+Result: OK: 19924989(c19922954+d2035) usec, 196574759 (1500byte,0frags)
+  9865739pps 118388Mb/sec (118388868000bps) errors: 0
+------------------------------------------------
+ >>> Testing with Hardware Offload DISABLED...
+ Current OVS other_config:
+{hw-offload="false", max-idle="30000"}
+>>> Starting Test: HW OFFLOAD OFF (dp:ovs)
+    Binding enp1s0f0v0 to pktgen thread...
+    Configuring pktgen parameters...
+    Current pktgen configuration:
+Params: count 0  min_pkt_size: 1500  max_pkt_size: 1500
+     src_mac: e4:11:22:33:44:00 dst_mac: e4:11:22:33:44:01
+     src_mac_count: 0  dst_mac_count: 0
+     cur_udp_dst: 0  cur_udp_src: 0
+    Starting traffic for 20 seconds...
+>>> Traffic is flowing. Waiting for 20 seconds...
+Average CPU Idle: 94,33%
+    Stopping traffic...
+>>> Statistics for HW OFFLOAD OFF (dp:ovs):
+     pkts-sofar: 179911858  errors: 0
+Result: OK: 19946443(c19943155+d3288) usec, 179911858 (1500byte,0frags)
+  9019746pps 108236Mb/sec (108236952000bps) errors: 0
+------------------------------------------------
+>>> Restoring Hardware Offload to ENABLED...
+>>> Benchmark Complete. HW Offload restored to ON.
+```
+
+- This is pktgen's configuration on vs0 that run pktgen successfully with OVS hw-offload=true/false
+```yaml
+root@tester03:~# ip netns exec ns0 bash -c "cat /proc/net/pktgen/enp1s0f0v0"
+Params: count 0  min_pkt_size: 1500  max_pkt_size: 1500
+     frags: 0  delay: 0  clone_skb: 1000  ifname: enp1s0f0v0
+     flows: 0 flowlen: 0
+     queue_map_min: 0  queue_map_max: 0
+     dst_min: 192.168.50.13  dst_max:
+     src_min:   src_max:
+     src_mac: e4:11:22:33:44:00 dst_mac: e4:11:22:33:44:03
+     udp_src_min: 9  udp_src_max: 9  udp_dst_min: 9  udp_dst_max: 9
+     src_mac_count: 0  dst_mac_count: 0
+     burst: 32
+     Flags: 
+Current:
+     pkts-sofar: 651047111  errors: 0
+     started: 5643316132us  stopped: 5709155149us idle: 4696us
+     seq_num: 651047112  cur_dst_mac_offset: 0  cur_src_mac_offset: 0
+     cur_saddr: 192.168.50.10  cur_daddr: 192.168.50.13 
+     cur_udp_dst: 9  cur_udp_src: 9
+     cur_queue_map: 0
+     flows: 0
+Result: OK: 65839017(c65834321+d4696) usec, 651047111 (1500byte,0frags)
+  9888469pps 118661Mb/sec (118661628000bps) errors: 0
+```
+

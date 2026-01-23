@@ -230,6 +230,12 @@ sleep 2
 echo ">>> CHECK HARDWARE OFFLOAD:"
 # Check OVS flows for offloading
 ovs-appctl dpctl/dump-flows -m | grep "eth_type(0x0800)" | grep "offloaded:yes"
+if [ $? -eq 0 ]; then
+    echo ">>> Hardware offload is ENABLED for IP flows."
+else
+    echo ">>> Hardware offload is NOT enabled for IP flows."
+fi
+
 sleep 1
 
 echo ">>> All done!"
