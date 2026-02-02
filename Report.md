@@ -1327,3 +1327,29 @@ Result: OK: 65839017(c65834321+d4696) usec, 651047111 (1500byte,0frags)
   9888469pps 118661Mb/sec (118661628000bps) errors: 0
 ```
 
+# 2026-01-26
+## Continue Testing Intel E810 with OVS - pktgen with 8 VFs
+#### Cable Connection - Port 0 <-> Port 1 of E810 - All VFs are configured on PF0
+##### Using pktgen to generate traffic with 16 VFs
+
+| Number of VFs | Offload Feature | Performance      | Bandwidth | Average CPU Idle  |
+|---------------|-----------------|-----------------|-------------------|--------------|
+| 16 VFs         | {hw-offload="true", max-idle="30000", tc-policy=skip_sw} | 18395 Mbps    | |67.12%               |
+| | | 14906 Mbps | | |
+| | | 13720 Mbps | 123201 Mbps | |
+| | | 13280 Mbps | | |
+| | | 13124 Mbps | | |
+| | | 13566 Mbps | | |
+| | | 14732 Mbps | | |
+| | | 18478 Mbps | | |
+| 16 VFs         | {hw-offload="false", max-idle="30000", tc-policy=skip_sw}|  20302 Mbps    | | 74.02%               |
+| | | 16005 Mbps | | |
+| | | 14803 Mbps | 129477 Mbps | |
+| | | 14492 Mbps | | |
+| | | 14462 Mbps | | |
+| | | 14790 Mbps | | |
+| | | 15798 Mbps | | |
+| | | 18825 Mbps | | |
+
+
+
