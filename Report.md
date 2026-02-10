@@ -1352,4 +1352,442 @@ Result: OK: 65839017(c65834321+d4696) usec, 651047111 (1500byte,0frags)
 | | | 18825 Mbps | | |
 
 
+# 2026-02-10 (Special Thanks to An Nguyen to research and build the test plan)
+## Continue Testing Intel E810 with OVS - netpert with 16 VFs
+#### Cable Connection - Port 0 <-> Port 1 of E810 - All VFs are configured on PF0
+##### 2 VFs - netpert - hw-offload=true
 
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh
+>>> Preparation: Starting 1 Servers...
+>>> Benchmark: Starting 1 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.11)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.11 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+[RESULT] Average CPU Idle: 91,11%
+Recv   Send    Send
+Socket Socket  Message  Elapsed                                                                                               
+Size   Size    Size     Time     Throughput                                                                                   
+bytes  bytes   bytes    secs.    10^6bits/sec
+131072  16384  16384    60.00    43464.32
+----------------------------------------------------------- 
+>>> Finished testing with 2 VFs (1 pairs).
+>>> Cleaned up netservers.
+```
+##### 4 VFs - netpert - hw-offload=true
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh                                                          
+>>> Preparation: Starting 2 Servers...                                                                                        
+>>> Benchmark: Starting 2 Clients simultaneously...                                                                           
+-----------------------------------------------------------                                                                   
+Pairing: ns0 ->  (192.168.50.13)                                                                                              
+Pairing: ns1 ->  (192.168.50.12)                                                                                              
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.13 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.12 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+                                                                                                                              
+[RESULT] Average CPU Idle: 82,99%                                                                                             
+!!! WARNING                                                                                                                   
+!!! Desired confidence was not achieved within the specified iterations.                                                      
+!!! This implies that there was variability in the test environment that                                                      
+!!! must be investigated before going further.                                                                                
+!!! Confidence intervals: Throughput      : 15.228%                                                                           
+!!!                       Local CPU util  : 0.000%                                                                            
+!!!                       Remote CPU util : 0.000%                                                                            
+                                                                                                                              
+Recv   Send    Send                                                                                                           
+Socket Socket  Message  Elapsed                                                                                               
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    29692.16   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 9.063%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    28836.30   
+-----------------------------------------------------------
+>>> Finished testing with 4 VFs (2 pairs).
+>>> Cleaned up netservers.
+```
+
+##### 8 VFs - netpert - hw-offload=true
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh 
+>>> Preparation: Starting 4 Servers...
+>>> Benchmark: Starting 4 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.17)
+Pairing: ns1 ->  (192.168.50.16)
+Pairing: ns2 ->  (192.168.50.15)
+Pairing: ns3 ->  (192.168.50.14)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.17 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.16 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.15 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.14 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+
+[RESULT] Average CPU Idle: 71,66%
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 8.455%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    17447.69   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    17540.22   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 13.763%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    16929.44   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 6.835%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    17321.80   
+-----------------------------------------------------------
+>>> Finished testing with 8 VFs (4 pairs).
+>>> Cleaned up netservers.
+```
+##### 16 VFs - netpert - hw-offload=true
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh
+>>> Preparation: Starting 8 Servers...
+>>> Benchmark: Starting 8 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.25)
+Pairing: ns1 ->  (192.168.50.24)
+Pairing: ns2 ->  (192.168.50.23)
+Pairing: ns3 ->  (192.168.50.22)
+Pairing: ns4 ->  (192.168.50.21)
+Pairing: ns5 ->  (192.168.50.20)
+Pairing: ns6 ->  (192.168.50.19)
+Pairing: ns7 ->  (192.168.50.18)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.25 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.22 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.24 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.23 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.18 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.20 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.21 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.19 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+[RESULT] Average CPU Idle: 66,87% 
+Recv   Send    Send
+Socket Socket  Message  Elapsed
+Size   Size    Size     Time     Throughput
+bytes  bytes   bytes    secs.    10^6bits/sec
+131072  16384  16384    60.00    9197.90 
+Recv   Send    Send
+Socket Socket  Message  Elapsed 
+Size   Size    Size     Time     Throughput
+bytes  bytes   bytes    secs.    10^6bits/sec
+131072  16384  16384    60.00    8906.98 
+!!! WARNING
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 17.426%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+Recv   Send    Send
+Socket Socket  Message  Elapsed
+Size   Size    Size     Time     Throughput
+bytes  bytes   bytes    secs.    10^6bits/sec
+131072  16384  16384    60.00    9969.81 
+!!! WARNING
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 22.969%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    10424.38   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 19.820%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    9665.40   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 18.924%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    9490.65   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 21.452%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    9532.74   
+!!! WARNING                                                    
+!!! Desired confidence was not achieved within the specified iterations.
+!!! This implies that there was variability in the test environment that
+!!! must be investigated before going further.
+!!! Confidence intervals: Throughput      : 22.081%
+!!!                       Local CPU util  : 0.000%
+!!!                       Remote CPU util : 0.000%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    9500.28   
+-----------------------------------------------------------
+>>> Finished testing with 16 VFs (8 pairs).
+>>> Cleaned up netservers.
+```
+
+##### 2 VFs - netpert - hw-offload=false - skip_sw
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh 
+>>> Preparation: Starting 1 Servers...
+>>> Benchmark: Starting 1 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.11)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.11 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+
+[RESULT] Average CPU Idle: 95,03%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.00    9508.78   
+-----------------------------------------------------------
+>>> Finished testing with 2 VFs (1 pairs).
+>>> Cleaned up netservers.
+```
+##### 4 VFs - netpert - hw-offload=false - skip_sw
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh                                                                                                                                                                                    
+>>> Preparation: Starting 2 Servers...
+>>> Benchmark: Starting 2 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.13)
+Pairing: ns1 ->  (192.168.50.12)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.12 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.13 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+
+[RESULT] Average CPU Idle: 95,08%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    4748.17   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    4748.17   
+-----------------------------------------------------------
+>>> Finished testing with 4 VFs (2 pairs).
+>>> Cleaned up netservers.
+```
+##### 8 VFs - netpert - hw-offload=false - skip_sw
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh                                                                                                                                                                                    
+>>> Preparation: Starting 4 Servers...
+>>> Benchmark: Starting 4 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.17)
+Pairing: ns1 ->  (192.168.50.16)
+Pairing: ns2 ->  (192.168.50.15)
+Pairing: ns3 ->  (192.168.50.14)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.16 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.17 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.15 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.14 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+
+[RESULT] Average CPU Idle: 94,84%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    2410.61   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    2410.64   
+131072  16384  16384    60.01    2410.52   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    2410.62   
+-----------------------------------------------------------
+>>> Finished testing with 8 VFs (4 pairs).
+>>> Cleaned up netservers.
+```
+
+##### 16 VFs - netpert - hw-offload=false - skip_sw
+
+```yaml
+root@tester03:/home/linux/vinhhuynh# ./bench_ovs_with_netperf_nvf.sh 
+>>> Preparation: Starting 8 Servers...
+>>> Benchmark: Starting 8 Clients simultaneously...
+-----------------------------------------------------------
+Pairing: ns0 ->  (192.168.50.25)
+Pairing: ns1 ->  (192.168.50.24)
+Pairing: ns2 ->  (192.168.50.23)
+Pairing: ns3 ->  (192.168.50.22)
+Pairing: ns4 ->  (192.168.50.21)
+Pairing: ns5 ->  (192.168.50.20)
+Pairing: ns6 ->  (192.168.50.19)
+Pairing: ns7 ->  (192.168.50.18)
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.25 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.24 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.22 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.23 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.21 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.19 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.18 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 192.168.50.20 () port 0 AF_INET : +/-2.500% @ 95% conf.  : demo
+
+[RESULT] Average CPU Idle: 93,35%
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.81   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.79   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.78   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.81   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.83   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.84
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1890.84   
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    60.01    1891.00   
+-----------------------------------------------------------
+>>> Finished testing with 16 VFs (8 pairs).
+>>> Cleaned up netservers.
+```
+
+##### Performance Comparison Summary
+
+| VF Count (Pairs) | HW-Offload | Total Throughput (Gbps) | Avg. Throughput per VF (Gbps) | Avg. CPU Idle | Stability (Warnings) |
+|------------------|------------|-------------------------|-------------------------------|---------------|----------------------|
+|2 VF (1 pair) | ON (true) | 43.46 | 43.46 | 91.11% | Stable (No warnings)|
+| |OFF (false)   | 9.51      | 9.51  | 95.03%| Stable |
+|4 VF (2 pairs)|ON (true)|~58.53|~29.26|82.99%|Unstable (Warnings present)|
+| |OFF (false)|~9.50|~4.75|95.08%|Stable|
+|8 VF (4 pairs)|ON (true)|~69.24|~17.31|71.66%|Unstable (Warnings present)|
+| | OFF (false)|~9.64|~2.41|94.84%|Stable|
+|16 VF (8 pairs)|ON (true)|~77.69|~9.71|66.87%|Unstable (Warnings present)|
+| |OFF (false)|~15.13|~1.89|93.35%|Stable|
