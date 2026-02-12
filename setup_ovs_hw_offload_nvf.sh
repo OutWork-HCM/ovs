@@ -35,7 +35,22 @@ NUM_VFS=16
 
 # Prefixes for Representors and Namespaces
 NS_PREFIX="ns"
+
+# Prefixes for Representors and Namespaces
+NS_PREFIX="ns"
 IP_PREFIX="192.168.50"
+
+# --- Recommendation 4: CPU Governance Tuning ---
+# Set CPU governor to performance to prevent latency spikes
+echo ">>> Tuning: Setting CPU governor to performance..."
+if command -v cpupower &> /dev/null; then
+    cpupower frequency-set -g performance
+else
+    for gov in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
+        echo performance > $gov 2>/dev/null || true
+    done
+fi
+
 
 echo ">>> Starting OVS Hardware Offload Configuration for $NUM_VFS VFs..."
 
@@ -79,6 +94,12 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
 done
 sleep 1
 
+# --- Recommendation 2: Enable Jumbo Frames (MTU 9000) ---
+# Set MTU 9000 on Uplink PF for high-throughput testing
+echo ">>> Tuning: Setting MTU 9000 on PF $PF0..."
+ip link set dev $PF0 mtu 9000
+
+
 # 5. Enable hw-tc-offload on PFs (Uplink port) and VF Port Representors
 echo ">>> Enabling hw-tc-offload on PFs..."
 ethtool -K $PF0 hw-tc-offload on 2>/dev/null
@@ -88,24 +109,36 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
     REAL_REP_NAME=""
 
     # Find the representor by checking phys_port_name
-    for dev_path in /sys/class/net/*/phys_port_name; do
-        if [ -f "$dev_path" ]; then
-            content=$(cat "$dev_path" 2>/dev/null)
-            if [ "$content" == "$TARGET_NAME" ]; then
-                REAL_REP_NAME=$(basename $(dirname "$dev_path"))
-                break
+    # Find the representor by checking phys_port_name
+    # --- Recommendation 3: Robustness - Check for Device Existence ---
+    # Wait for representor to be created by the driver
+    for attempt in {1..10}; do
+        for dev_path in /sys/class/net/*/phys_port_name; do
+            if [ -f "$dev_path" ]; then
+                content=$(cat "$dev_path" 2>/dev/null)
+                if [ "$content" == "$TARGET_NAME" ]; then
+                    REAL_REP_NAME=$(basename $(dirname "$dev_path"))
+                    break 2
+                fi
             fi
-        fi
+        done
+        sleep 0.5
     done
 
     if [ -n "$REAL_REP_NAME" ]; then
         echo ">>> Found Representor: $REAL_REP_NAME for VF $i"
         echo ">>> Enabling hw-tc-offload on $REAL_REP_NAME..."
         ethtool -K $REAL_REP_NAME hw-tc-offload on 2>/dev/null
+        
+        # --- Recommendation 2: Enable Jumbo Frames (MTU 9000) ---
+        # Set MTU 9000 on Representor
+        echo ">>> Tuning: Setting MTU 9000 on Representor $REAL_REP_NAME..."
+        ip link set dev $REAL_REP_NAME mtu 9000
     else
         echo ">>> ERROR: Could not find Representor for VF $i"
     fi
 done
+
 
 # 6. Open vSwitch Configuration
 ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
@@ -131,14 +164,19 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
     REAL_REP_NAME=""
 
     # Find the representor by checking phys_port_name
-    for dev_path in /sys/class/net/*/phys_port_name; do
-        if [ -f "$dev_path" ]; then
-            content=$(cat "$dev_path" 2>/dev/null)
-            if [ "$content" == "$TARGET_NAME" ]; then
-                REAL_REP_NAME=$(basename $(dirname "$dev_path"))
-                break
+    # --- Recommendation 3: Robustness - Check for Device Existence ---
+    # Wait for representor to be created by the driver
+    for attempt in {1..10}; do
+        for dev_path in /sys/class/net/*/phys_port_name; do
+            if [ -f "$dev_path" ]; then
+                content=$(cat "$dev_path" 2>/dev/null)
+                if [ "$content" == "$TARGET_NAME" ]; then
+                    REAL_REP_NAME=$(basename $(dirname "$dev_path"))
+                    break 2
+                fi
             fi
-        fi
+        done
+        sleep 0.5
     done
 
     if [ -n "$REAL_REP_NAME" ]; then
@@ -200,7 +238,13 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
     ip netns exec $NS_NAME ip link set $VF_INTERFACE up
     ip netns exec $NS_NAME ip link set lo up
 
+    # --- Recommendation 2: Enable Jumbo Frames (MTU 9000) ---
+    # Set MTU 9000 on VF interface inside namespace
+    echo ">>> Tuning: Setting MTU 9000 on VF $VF_INTERFACE inside $NS_NAME..."
+    ip netns exec $NS_NAME ip link set dev $VF_INTERFACE mtu 9000
+
     echo "Configured $NS_NAME with IP $IP_ADDR"
+
 done
 
 echo ">>> Configuration Complete!"
@@ -239,3 +283,18 @@ fi
 sleep 1
 
 echo ">>> All done!"
+
+# --- Recommendation 1: Fix IP & Namespace Mismatch (Clarification) ---
+echo "================================================================"
+echo "   Namespace IP Assignment Map (Use these for Benchmarks)"
+echo "================================================================"
+echo "   Namespace       IP Address"
+echo "   ---------       ----------"
+for i in $(seq 0 $(($NUM_VFS - 1))); do
+    NS_NAME="${NS_PREFIX}${i}"
+    IP_ADDR="${IP_PREFIX}.$(($i + 10))"
+    echo "   $NS_NAME            $IP_ADDR"
+done
+echo "================================================================"
+echo "Note: Update your benchmark scripts to match these IPs."
+
