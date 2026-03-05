@@ -1791,3 +1791,149 @@ bytes  bytes   bytes    secs.    10^6bits/sec
 | | OFF (false)|~9.64|~2.41|94.84%|Stable|
 |16 VF (8 pairs)|ON (true)|~77.69|~9.71|66.87%|Unstable (Warnings present)|
 | |OFF (false)|~15.13|~1.89|93.35%|Stable|
+
+
+# 2026-02-26 
+## Continue Testing Intel E810 with OVS - iperf3/netpert with 2 VFs using linux-containers (lxc)
+### Setup
+- Using linux container (lxc) to create 2 containers (lxc-pc1 and lxc-pc2) to run netperf server and client respectively
+- Each container is configured with 1 VF and connected to OVS bridge (br0) with hw-offload ENABLED
+```bash
+# Install lxc and create linux-containers
+sudo apt-get install -y lxc
+sudo lxc-create -n lxc-pc1 -t download -- -d ubuntu -r jammy -a amd64
+sudo lxc-create -n lxc-pc2 -t download -- -d ubuntu -r jammy -a amd64
+# Configure network interfaces for each container and connect to OVS bridge
+sudo nvim /var/lib/lxc/lxc-pc1/config
+sudo nvim /var/lib/lxc/lxc-pc2/config
+# Start the containers
+sudo lxc-start -n lxc-pc1
+sudo lxc-start -n lxc-pc2
+# Attach to each container and install netperf
+sudo lxc-attach -n lxc-pc1 -- apt-get update && apt-get install -y netperf iperf3
+sudo lxc-attach -n lxc-pc2 -- apt-get update && apt-get install -y netperf iperf3
+```
+config file for lxc-pc1
+```ini
+# Network configuration for lxc-pc1
+# Template used to create this container: /usr/share/lxc/templates/lxc-download
+# Parameters passed to the template: -d ubuntu -r jammy -a amd64
+# For additional config options, please look at lxc.container.conf(5)
+
+# Uncomment the following line to support nesting containers:
+#lxc.include = /usr/share/lxc/config/nesting.conf
+# (Be aware this has security implications)
+
+
+# Distribution configuration
+lxc.include = /usr/share/lxc/config/common.conf
+lxc.arch = linux64
+
+# Container specific configuration
+lxc.rootfs.path = dir:/var/lib/lxc/lxc-pc1/rootfs
+lxc.uts.name = lxc-pc1
+
+# Network configuration
+# lxc.net.0.type = veth
+# lxc.net.0.link = lxcbr0
+# lxc.net.0.flags = up
+# lxc.net.0.hwaddr = 00:16:3e:d5:e2:6d
+
+# VF passthrough
+lxc.net.0.type = phys
+lxc.net.0.link = enp1s0f0v0
+lxc.net.0.name = eth0
+lxc.net.0.flags = up
+```
+
+config file for lxc-pc2
+```ini
+# Network configuration for lxc-pc2
+# Template used to create this container: /usr/share/lxc/templates/lxc-download
+# Parameters passed to the template: -d ubuntu -r jammy -a amd64
+# For additional config options, please look at lxc.container.conf(5)
+
+# Uncomment the following line to support nesting containers:
+#lxc.include = /usr/share/lxc/config/nesting.conf
+# (Be aware this has security implications)
+
+
+# Distribution configuration
+lxc.include = /usr/share/lxc/config/common.conf
+lxc.arch = linux64
+
+# Container specific configuration
+lxc.rootfs.path = dir:/var/lib/lxc/lxc-pc2/rootfs
+lxc.uts.name = lxc-pc2
+
+# Network configuration
+# lxc.net.0.type = veth
+# lxc.net.0.link = lxcbr0
+# lxc.net.0.flags = up
+# lxc.net.0.hwaddr = 00:16:3e:db:ec:7a
+
+# VF passthrough
+lxc.net.0.type = phys
+lxc.net.0.link = enp1s0f0v1
+lxc.net.0.name = eth0
+lxc.net.0.flags = up
+```
+### Test Results
+- With hw-offload enabled, the iperf test between lxc-pc1 and lxc-pc2
+```yaml
+root@lxc-pc2:~# iperf3 -c 10.10.10.1 -t 30
+Connecting to host 10.10.10.1, port 5201
+[  5] local 10.10.10.2 port 34954 connected to 10.10.10.1 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  4.88 GBytes  41.9 Gbits/sec  3509    936 KBytes       
+[  5]   1.00-2.00   sec  4.89 GBytes  42.0 Gbits/sec  5686    776 KBytes       
+[  5]   2.00-3.00   sec  4.95 GBytes  42.5 Gbits/sec  4798    663 KBytes       
+[  5]   3.00-4.00   sec  5.05 GBytes  43.4 Gbits/sec  5907    858 KBytes       
+[  5]   4.00-5.00   sec  5.10 GBytes  43.8 Gbits/sec  4975    730 KBytes       
+[  5]   5.00-6.00   sec  4.95 GBytes  42.5 Gbits/sec  4754    748 KBytes       
+[  5]   6.00-7.00   sec  4.89 GBytes  42.0 Gbits/sec  4559    574 KBytes       
+[  5]   7.00-8.00   sec  4.86 GBytes  41.8 Gbits/sec  3614    530 KBytes       
+[  5]   8.00-9.00   sec  4.89 GBytes  42.0 Gbits/sec  3475    915 KBytes       
+[  5]   9.00-10.00  sec  4.90 GBytes  42.1 Gbits/sec  3435    943 KBytes       
+[  5]  10.00-11.00  sec  4.89 GBytes  42.0 Gbits/sec  4702    922 KBytes       
+[  5]  11.00-12.00  sec  4.88 GBytes  41.9 Gbits/sec  5432    577 KBytes       
+[  5]  12.00-13.00  sec  4.87 GBytes  41.8 Gbits/sec  4335    991 KBytes       
+[  5]  13.00-14.00  sec  4.92 GBytes  42.2 Gbits/sec  4630    529 KBytes       
+[  5]  14.00-15.00  sec  5.29 GBytes  45.5 Gbits/sec  4598    766 KBytes       
+[  5]  15.00-16.00  sec  5.16 GBytes  44.3 Gbits/sec  5420    677 KBytes       
+[  5]  16.00-17.00  sec  4.84 GBytes  41.6 Gbits/sec  4919    564 KBytes       
+[  5]  17.00-18.00  sec  4.84 GBytes  41.6 Gbits/sec  6270    592 KBytes       
+[  5]  18.00-19.00  sec  5.00 GBytes  43.0 Gbits/sec  4709    735 KBytes       
+[  5]  19.00-20.00  sec  5.27 GBytes  45.3 Gbits/sec  5775    571 KBytes       
+[  5]  20.00-21.00  sec  4.89 GBytes  42.0 Gbits/sec  5055    687 KBytes       
+[  5]  21.00-22.00  sec  4.85 GBytes  41.6 Gbits/sec  5166    758 KBytes       
+[  5]  22.00-23.00  sec  4.85 GBytes  41.7 Gbits/sec  4565    823 KBytes       
+[  5]  23.00-24.00  sec  4.85 GBytes  41.7 Gbits/sec  5166    922 KBytes       
+[  5]  24.00-25.00  sec  4.79 GBytes  41.1 Gbits/sec  4564    536 KBytes       
+[  5]  25.00-26.00  sec  4.55 GBytes  39.1 Gbits/sec  3396    872 KBytes       
+[  5]  26.00-27.00  sec  4.53 GBytes  38.9 Gbits/sec  2786    535 KBytes       
+[  5]  27.00-28.00  sec  4.79 GBytes  41.1 Gbits/sec  4182    584 KBytes       
+[  5]  28.00-29.00  sec  4.65 GBytes  39.9 Gbits/sec  4302    601 KBytes       
+[  5]  29.00-30.00  sec  4.86 GBytes  41.7 Gbits/sec  4535    949 KBytes       
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-30.00  sec   147 GBytes  42.1 Gbits/sec  139219             sender
+[  5]   0.00-30.04  sec   147 GBytes  42.0 Gbits/sec                  receiver
+```
+
+- With hw-offload enabled, the netperf test between lxc-pc1 and lxc-pc2
+```yaml
+netperf -H 10.10.10.1 -t TCP_STREAM -l 30
+MIGRATED TCP STREAM TEST from 0.0.0.0 (0.0.0.0) port 0 AF_INET to 10.10.10.1 () port 0 AF_INET : demo
+Recv   Send    Send                          
+Socket Socket  Message  Elapsed              
+Size   Size    Size     Time     Throughput  
+bytes  bytes   bytes    secs.    10^6bits/sec  
+
+131072  16384  16384    30.00    43562.92
+```
+
+
+
+
+
