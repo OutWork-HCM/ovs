@@ -1933,7 +1933,408 @@ bytes  bytes   bytes    secs.    10^6bits/sec
 131072  16384  16384    30.00    43562.92
 ```
 
+# 2026-03-06
+## Setup Proxmox on Tester03 and test OVS with netperf in VMs
+### Install Proxmox VE 9.1.2 with IP 192.168.1.243/24 on Tester03
+- 192.168.1.243 pve.vbtechx.com pve user@vbtechx.com
+- After installing Proxmox VE on Tester03, rebooted the machine and accessed the Proxmox web interface at https://192.168.1.243:8006
+- Access https://community-scripts.github.io/ProxmoxVE/scripts?id=post-pve-install to run the post-installation script to set up the environment for testing.
+- After running the script, if see the error "Broken pip 596", login to pve by ssh and run the following command to fix issue:
+```bash
+root@pve:~# systemctl restart pveproxy
+```
+- Check again the pveproxy service status and see that it is running without error:
+```yaml
+root@pve:~# systemctl status pveproxy                                                                                                                                                                                                                        
+● pveproxy.service - PVE API Proxy Server                                                                                                                                                                                                                    
+     Loaded: loaded (/usr/lib/systemd/system/pveproxy.service; enabled; preset: enabled)                                                                                                                                                                     
+     Active: active (running) since Fri 2026-03-06 11:06:09 +07; 8s ago
+ Invocation: 072debde4399462fbdd1892c6235ddb9                                                                                 
+    Process: 7162 ExecStartPre=/usr/bin/pvecm updatecerts --silent (code=exited, status=0/SUCCESS)
+    Process: 7166 ExecStart=/usr/bin/pveproxy start (code=exited, status=0/SUCCESS)
+    Process: 7171 ExecStartPost=sh -c [ ! -e /var/log/pveam.log ] && /usr/bin/pveupdate (code=exited, status=1/FAILURE)
+   Main PID: 7167 (pveproxy)                                                                                                  
+      Tasks: 4 (limit: 154079)                                                                                                
+     Memory: 166.6M (peak: 182.6M)
+        CPU: 579ms            
+     CGroup: /system.slice/pveproxy.service
+             ├─7167 pveproxy
+             ├─7168 "pveproxy worker"      
+             ├─7169 "pveproxy worker"
+             └─7170 "pveproxy worker"
+                                                               
+Mar 06 11:06:08 pve systemd[1]: Starting pveproxy.service - PVE API Proxy Server...
+Mar 06 11:06:09 pve pveproxy[7167]: starting server
+Mar 06 11:06:09 pve pveproxy[7167]: starting 3 worker(s)                                                                      
+Mar 06 11:06:09 pve pveproxy[7167]: worker 7168 started
+Mar 06 11:06:09 pve pveproxy[7167]: worker 7169 started 
+Mar 06 11:06:09 pve pveproxy[7167]: worker 7170 started
+Mar 06 11:06:09 pve systemd[1]: Started pveproxy.service - PVE API Proxy Server.
+```
+- upgraded the Proxmox VE to latest version and rebooted the machine to make sure all updates are applied successfully.
+```bash
+root@pve:~# apt-get update && apt-get dist-upgrade -y
+root@pve:~# reboot
+```
+
+### Activate SRIOV on Proxmox VE
+- Enabled immou in proxmox VE
+```yaml
+apt install vim
+vim /etc/default/grub
+# Edit the GRUB_CMDLINE_LINUX_DEFAULT line to include "intel_iommu=on iommu=pt"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet intel_iommu=on iommu=pt"
+# Save the file and update grub
+update-grub
+# Reboot the machine to apply changes
+reboot
+# After reboot, check if IOMMU is enabled
+dmesg | grep -e DMAR -e iommu
+root@pve:~# dmesg | grep -e DMAR -e IOMMU
+[    0.018666] ACPI: DMAR 0x000000003707D000 000088 (v02 INTEL  EDK2     00000002      01000013)
+[    0.018712] ACPI: Reserving DMAR table memory at [mem 0x3707d000-0x3707d087]
+[    0.158659] DMAR: IOMMU enabled
+[    0.370398] DMAR: Host address width 39
+[    0.370399] DMAR: DRHD base: 0x000000fed90000 flags: 0x0
+[    0.370405] DMAR: dmar0: reg_base_addr fed90000 ver 4:0 cap 1c0000c40660462 ecap 29a00f0505e
+[    0.370407] DMAR: DRHD base: 0x000000fed91000 flags: 0x1
+[    0.370411] DMAR: dmar1: reg_base_addr fed91000 ver 5:0 cap d2008c40660462 ecap f050da
+[    0.370413] DMAR: RMRR base: 0x0000003e000000 end: 0x000000407fffff
+[    0.370415] DMAR-IR: IOAPIC id 2 under DRHD base  0xfed91000 IOMMU 1
+[    0.370417] DMAR-IR: HPET id 0 under DRHD base 0xfed91000
+[    0.370418] DMAR-IR: Queued invalidation will be enabled to support x2apic and Intr-remapping.
+[    0.372028] DMAR-IR: Enabled IRQ remapping in x2apic mode
+[    1.752512] pci 0000:00:02.0: DMAR: Skip IOMMU disabling for graphics
+[    1.836988] DMAR: No ATSR found
+[    1.836989] DMAR: No SATC found
+[    1.836990] DMAR: dmar0: Using Queued invalidation
+[    1.836994] DMAR: dmar1: Using Queued invalidation
+[    1.837889] DMAR: Intel(R) Virtualization Technology for Directed I/O
+```
+Reference: https://pve.proxmox.com/wiki/PCI_Passthrough#Enable_IOMMU
+
+### Install Open vSwitch on Proxmox VE
+- Installed Open vSwitch on Proxmox VE using the following command:
+```bash
+ apt update
+ apt install openvswitch-switch
+```
+
+### Create ovs-sriov script and enable it to start on boot
+
+```yaml
+
+# Create the /usr/local/bin/ovs-sriov-setup.sh file
+
+#!/bin/bash
+
+# Check if the script is run as root
+if [ "$EUID" -ne 0 ]; then 
+  echo "Please run as root"
+  exit
+fi
+
+# --- Variables Configuration ---
+BRIDGE="ovs_sriov"
+# PF0="enp1s0f0np0"
+# PF1="enp1s0f1np1"
+# Proxmox uses different naming convention for interfaces, adjust accordingly if needed
+PF0="nic2"
+PF1="nic3"
+VENDOR="Intel"
+NUM_VFS=4
+MTU_VAL=8996
+
+# Reload driver for Intel NICs to ensure clean state
+if [ "$VENDOR" == "Intel" ]; then
+    rmmod ice 2>/dev/null
+    modprobe ice 2>/dev/null
+    sleep 2
+elif [ "$VENDOR" == "Mellanox" ]; then
+    rmmod mlx5_core mlx5_ib 2>/dev/null
+    modprobe mlx5_core 2>/dev/null
+    sleep 2
+fi
+
+PCI_PF0=$(grep PCI_SLOT_NAME /sys/class/net/$PF0/device/uevent | sed 's:.*PCI_SLOT_NAME=::')
+PCI_PF1=$(grep PCI_SLOT_NAME /sys/class/net/$PF1/device/uevent | sed 's:.*PCI_SLOT_NAME=::')
+
+echo ">>> Starting OVS Hardware Offload Configuration for $NUM_VFS VFs..."
+
+# 1. Cleanup existing configuration
+echo ">>> Cleaning up old configurations..."
+ovs-vsctl del-br $BRIDGE 2>/dev/null
+tc qdisc del dev $PF0 ingress 2>/dev/null
+
+echo ">>> Configuring Open vSwitch..."
+systemctl start openvswitch-switch
+ovs-vsctl --no-wait add-br $BRIDGE
+ip link set $PF0 mtu $MTU_VAL
+ip link set $BRIDGE mtu $MTU_VAL
+
+# 2. Initialize SR-IOV VFs
+echo ">>> Initializing $NUM_VFS VFs on $PF0..."
+echo 0 > /sys/class/net/$PF0/device/sriov_numvfs
+sleep 1
+
+# 3. Configure "switchdev" mode
+echo ">>> Setting $PF0 ($PCI_PF0) to switchdev mode..."
+devlink dev eswitch set pci/$PCI_PF0 mode switchdev
+
+# 4. Create VFs
+echo $NUM_VFS > /sys/class/net/$PF0/device/sriov_numvfs
+sleep 2
+
+# 5. Enable hw-tc-offload and Configure OVS
+ethtool -K $PF0 hw-tc-offload on 2>/dev/null
+ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
+ovs-vsctl set Open_vSwitch . other_config:max-idle=30000
+systemctl restart openvswitch-switch
+
+# --- Array to store mapping for the final report ---
+DECLARE_MAPPING=()
+
+# 6. Find Representors, Add to OVS and Map to VFs
+echo ">>> Mapping VFs to Representors..."
+
+for i in $(seq 0 $(($NUM_VFS - 1))); do
+    # A. Find Real VF Name (The interface the VM/App will use)
+    # This looks into the PCI tree to find the net interface name assigned to this VF
+    VF_REAL_NAME=$(ls /sys/class/net/$PF0/device/virtfn$i/net/ 2>/dev/null)
+    
+    # B. Find Representor Name
+    TARGET_NAME="pf0vf$i"
+    REAL_REP_NAME=""
+    for dev_path in /sys/class/net/*/phys_port_name; do
+        if [ -f "$dev_path" ]; then
+            content=$(cat "$dev_path" 2>/dev/null)
+            if [ "$content" == "$TARGET_NAME" ]; then
+                REAL_REP_NAME=$(basename $(dirname "$dev_path"))
+                break
+            fi
+        fi
+    done
+
+    if [ -n "$REAL_REP_NAME" ]; then
+        echo ">>> VF $i: Representor=$REAL_REP_NAME, Real Interface=${VF_REAL_NAME:-'Unknown'}"
+        ethtool -K $REAL_REP_NAME hw-tc-offload on 2>/dev/null
+        ovs-vsctl --may-exist add-port $BRIDGE $REAL_REP_NAME
+	ip link set $REAL_REP_NAME mtu $MTU_VAL
+	ip link set $VF_REAL_NAME mtu $MTU_VAL 2>/dev/null
+        ip link set $REAL_REP_NAME up
+        ip link set $VF_REAL_NAME up 2>/dev/null
+        
+        # Save to array for final summary
+        DECLARE_MAPPING+=("$i|${VF_REAL_NAME:-'N/A'}|$REAL_REP_NAME")
+    else
+        echo ">>> ERROR: Could not find Representor for VF $i"
+    fi
+done
+
+ovs-vsctl --no-wait add-port $BRIDGE $PF0
+ip addr add 10.10.10.1/24 dev $BRIDGE
+ip link set $PF0 up
+ip link set $BRIDGE up
+
+# --- FINAL SUMMARY TABLE ---
+echo ""
+echo "========================================================="
+echo "   SR-IOV HW OFFLOAD MAPPING SUMMARY"
+echo "========================================================="
+printf "%-10s | %-20s | %-20s\n" "VF Index" "VF Interface (Real)" "Representor (OVS)"
+echo "---------------------------------------------------------"
+for item in "${DECLARE_MAPPING[@]}"; do
+    IFS='|' read -r index vfname repname <<< "$item"
+    printf "%-10s | %-20s | %-20s\n" "VF $index" "$vfname" "$repname"
+done
+echo "========================================================="
+echo ">>> Configuration Complete!"
+```
+
+- Made the script executable and enabled it to run on boot
+```bash
+chmod +x /usr/local/bin/ovs-sriov-setup.sh
+```
+- To enable the script to run on boot, create a systemd service file at /etc/systemd/system/ovs-sriov.service
+```ini
+[Unit]
+Description=Setup OVS SR-IOV Hardware Offload
+After=network-pre.target openvswitch-switch.service
+Before=pve-guests.service
+Wants=openvswitch-switch.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/ovs-sriov-setup.sh
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target
+```
+- Configure network interfaces of Proxmox /etc/network/interfaces
+```yaml
+auto lo
+iface lo inet loopback
+
+iface nic0 inet manual
+
+auto vmbr0
+iface vmbr0 inet static
+        address 192.168.1.243/24
+        gateway 192.168.1.1
+        bridge-ports nic0
+        bridge-stp off
+        bridge-fd 0
+
+iface nic1 inet manual
+
+iface nic2 inet manual
+
+auto ovs_sriov
+iface ovs_sriov inet static
+    address 10.10.10.1/24
+    ovs_type OVSBridge
+    ovs_ports nic2
+    ovs_mtu 8996
+
+iface nic3 inet manual
 
 
+source /etc/network/interfaces.d/*
+```
+- Check the status of the service and see that it is active without error
+```bash
+systemctl daemon-reload
+systemctl enable ovs-sriov.service
+systemctl start ovs-sriov.service
+systemctl status ovs-sriov.service
+```
+
+- Check on web-ui of Proxmox VE and see that the ovs_sriov bridge is created successfully with nic2 as its port
+
+### Results 
+#### 2 LXC with 8 cores and 8GB RAM each
+- Created 2 LXC containers (lxc-pc2 and lxc-pc3)
+- ovs Configuration on Proxmox VE
+```yaml
+root@pve ~ $ uname -r
+6.17.13-1-pve
+
+root@pve ~ $ ovs-vsctl show
+99410ecb-eb91-455d-a479-246631347f4a
+    Bridge ovs_sriov
+        Port enp1s0f0r0
+            Interface enp1s0f0r0
+        Port enp1s0f0r2
+            Interface enp1s0f0r2
+        Port enp1s0f0r3
+            Interface enp1s0f0r3
+        Port ovs_sriov
+            Interface ovs_sriov
+                type: internal
+        Port enp1s0f0r1
+            Interface enp1s0f0r1
+        Port nic2
+            Interface nic2
+    ovs_version: "3.5.0"
+
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000", tc-policy=skip_sw}
+
+root@pve ~ $ ethtool -k nic2 | grep hw-tc
+hw-tc-offload: on
+root@pve ~ $ ethtool -k enp1s0f0r0 | grep tc-offload
+hw-tc-offload: on
+root@pve ~ $ ethtool -k enp1s0f0r1 | grep tc-offload
+hw-tc-offload: on
+root@pve ~ $ ethtool -k enp1s0f0r2 | grep tc-offload
+hw-tc-offload: on
+root@pve ~ $ ethtool -k enp1s0f0r3 | grep tc-offload
+hw-tc-offload: on
+
+root@pve ~ $ devlink dev eswitch show pci/0000:01:00.0 
+pci/0000:01:00.0: mode switchdev
+
+```
+
+- Inside each LXC, check the network interfaces and see that the VF interface is present with correct MTU configured
+```yaml
+root@ovs-pc2:~# ethtool -k eth1 | grep tc-                                                                                    │
+hw-tc-offload: on
+
+root@ovs-pc2:~# ethtool -i eth1                                                                                               │       valid_lft forever preferred_lft forever
+driver: iavf                                                                                                                  │root@ovs-pc3:~# 
+version: 6.17.13-1-pve                                                                                                        │
+firmware-version: N/A                                                                                                         │
+expansion-rom-version:                                                                                                        │
+bus-info: 0000:01:01.1                                                                                                        │
+supports-statistics: yes                                                                                                      │
+supports-test: no                                                                                                             │
+supports-eeprom-access: no                                                                                                    │
+supports-register-dump: no                                                                                                    │
+supports-priv-flags: no
+
+root@ovs-pc2:~# ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0@if65: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether bc:24:11:b0:c1:03 brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.168.1.15/24 metric 1024 brd 192.168.1.255 scope global dynamic eth0
+       valid_lft 11631sec preferred_lft 11631sec
+    inet6 fe80::be24:11ff:feb0:c103/64 scope link 
+       valid_lft forever preferred_lft forever
+54: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8996 qdisc mq state UP group default qlen 1000
+    link/ether 32:b7:1b:b1:74:74 brd ff:ff:ff:ff:ff:ff
+    altname enp1s0f0v1
+    inet 10.10.10.12/24 scope global eth1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::30b7:1bff:feb1:7474/64 scope link 
+       valid_lft forever preferred_lft forever
+
+root@ovs-pc3:~# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: eth0@if61: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default qlen 1000
+    link/ether bc:24:11:01:8a:7b brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet 192.168.1.17/24 metric 1024 brd 192.168.1.255 scope global dynamic eth0
+       valid_lft 11518sec preferred_lft 11518sec
+    inet6 fe80::be24:11ff:fe01:8a7b/64 scope link 
+       valid_lft forever preferred_lft forever
+55: eth1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8996 qdisc mq state UP group default qlen 1000
+    link/ether ee:d1:72:18:e5:76 brd ff:ff:ff:ff:ff:ff
+    inet 10.10.10.13/24 scope global eth1
+       valid_lft forever preferred_lft forever
+    inet6 fe80::ecd1:72ff:fe18:e576/64 scope link 
+       valid_lft forever preferred_lft forever
+root@ovs-pc3:~# ethtool -k eth1 | grep tc-
+hw-tc-offload: on
+root@ovs-pc3:~# ethtool -i eth1
+driver: iavf
+version: 6.17.13-1-pve
+firmware-version: N/A
+expansion-rom-version: 
+bus-info: 0000:01:01.2
+supports-statistics: yes
+supports-test: no
+supports-eeprom-access: no
+supports-register-dump: no
+supports-priv-flags: no
+```
+- Run iperf3 test between lxc-pc2 and lxc-pc3 and see that the throughput is only around 17Gbps which indicates that hw-offload is not working as expected. Will need to investigate further on this issue.
+
+![iperf3 Test Result](./Pics/ReportIPerf3-20260310-102913.png)
+
+- Run netperf test between pc2 and pc3 and see that the throughput is only around 17Gbps which also indicates that hw-offload is not working as expected. Need to investigate further on this issue.
+
+![netperf Test Result](./Pics/ReportNetperf-20260310-104535.png)
 
 

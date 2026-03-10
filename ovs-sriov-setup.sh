@@ -7,14 +7,15 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # --- Variables Configuration ---
-BRIDGE="ovs-sriov"
+BRIDGE="ovs_sriov"
 # PF0="enp1s0f0np0"
 # PF1="enp1s0f1np1"
 # Proxmox uses different naming convention for interfaces, adjust accordingly if needed
 PF0="nic2"
-PF1="nic2"
+PF1="nic3"
 VENDOR="Intel"
-NUM_VFS=2
+NUM_VFS=4
+MTU_VAL=8996
 
 # Reload driver for Intel NICs to ensure clean state
 if [ "$VENDOR" == "Intel" ]; then
@@ -40,7 +41,8 @@ tc qdisc del dev $PF0 ingress 2>/dev/null
 echo ">>> Configuring Open vSwitch..."
 systemctl start openvswitch-switch
 ovs-vsctl --no-wait add-br $BRIDGE
-ovs-vsctl --no-wait add-port $BRIDGE $PF0
+ip link set $PF0 mtu $MTU_VAL
+ip link set $BRIDGE mtu $MTU_VAL
 
 # 2. Initialize SR-IOV VFs
 echo ">>> Initializing $NUM_VFS VFs on $PF0..."
@@ -89,6 +91,8 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
         echo ">>> VF $i: Representor=$REAL_REP_NAME, Real Interface=${VF_REAL_NAME:-'Unknown'}"
         ethtool -K $REAL_REP_NAME hw-tc-offload on 2>/dev/null
         ovs-vsctl --may-exist add-port $BRIDGE $REAL_REP_NAME
+	ip link set $REAL_REP_NAME mtu $MTU_VAL
+	ip link set $VF_REAL_NAME mtu $MTU_VAL 2>/dev/null
         ip link set $REAL_REP_NAME up
         ip link set $VF_REAL_NAME up 2>/dev/null
         
@@ -99,6 +103,8 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
     fi
 done
 
+ovs-vsctl --no-wait add-port $BRIDGE $PF0
+ip addr add 10.10.10.1/24 dev $BRIDGE
 ip link set $PF0 up
 ip link set $BRIDGE up
 
