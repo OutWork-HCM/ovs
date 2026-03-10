@@ -1,0 +1,15 @@
+[Unit]
+Description=Setup OVS SR-IOV Hardware Offload
+After=network-pre.target openvswitch-switch.service
+Before=pve-guests.service
+Wants=openvswitch-switch.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/ovs-sriov-setup.sh
+ExecStop=/usr/bin/ovs-vsctl del-br ovs_sriov ; /usr/bin/echo 0 > /sys/class/net/nic2/device/sriov_numvfs
+StandardOutput=journal+console
+
+[Install]
+WantedBy=multi-user.target

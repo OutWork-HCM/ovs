@@ -2088,6 +2088,8 @@ sleep 2
 # 5. Enable hw-tc-offload and Configure OVS
 ethtool -K $PF0 hw-tc-offload on 2>/dev/null
 ovs-vsctl set Open_vSwitch . other_config:hw-offload=true
+# Update base on Proxmox Docs: Ensure TC policy is set for hardware path
+ovs-vsctl set Open_vSwitch . other_config:tc-policy=skip_sw
 ovs-vsctl set Open_vSwitch . other_config:max-idle=30000
 systemctl restart openvswitch-switch
 
@@ -2131,8 +2133,15 @@ for i in $(seq 0 $(($NUM_VFS - 1))); do
     fi
 done
 
+# --- Host Connectivity Configuration ---
+# Update base on Proxmox Docs: Bridges should not have IPs. Use an Internal Port for Host IP
+echo ">>> Configuring Host Internal Port (mgmt0)..."
+ovs-vsctl --may-exist add-port $BRIDGE mgmt0 -- set interface mgmt0 type=internal
+ip link set mgmt0 mtu $MTU_VAL
+ip addr add 10.10.10.1/24 dev mgmt0
+ip link set mgmt0 up
+
 ovs-vsctl --no-wait add-port $BRIDGE $PF0
-ip addr add 10.10.10.1/24 dev $BRIDGE
 ip link set $PF0 up
 ip link set $BRIDGE up
 
@@ -2167,6 +2176,7 @@ Wants=openvswitch-switch.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/ovs-sriov-setup.sh
+ExecStop=/usr/bin/ovs-vsctl del-br ovs_sriov ; /usr/bin/echo 0 > /sys/class/net/nic2/device/sriov_numvfs
 StandardOutput=journal+console
 
 [Install]
@@ -2181,11 +2191,11 @@ iface nic0 inet manual
 
 auto vmbr0
 iface vmbr0 inet static
-        address 192.168.1.243/24
-        gateway 192.168.1.1
-        bridge-ports nic0
-        bridge-stp off
-        bridge-fd 0
+	address 192.168.1.243/24
+	gateway 192.168.1.1
+	bridge-ports nic0
+	bridge-stp off
+	bridge-fd 0
 
 iface nic1 inet manual
 
