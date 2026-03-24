@@ -2347,4 +2347,93 @@ supports-priv-flags: no
 
 ![netperf Test Result](./Pics/ReportNetperf-20260310-104535.png)
 
+# 2026-03-24
+## Reinstall Proxmox 8.4.17 && continue Testing OVS with SRIOV on Proxmox VE - iperf3/netperf test with 2 VFs using VMs
+### Reinstall Proxmox VE 8.4.17 on Tester03 and set up environment for Testing
+
+```yaml
+root@pve ~ $ uname -r
+6.8.12-20-pve
+
+root@pve ~ $ dmesg | grep -e DMAR -e IOMMU
+[    0.017708] ACPI: DMAR 0x000000003707D000 000088 (v02 INTEL  EDK2     00000002      01000013)
+[    0.017758] ACPI: Reserving DMAR table memory at [mem 0x3707d000-0x3707d087]
+[    0.157695] DMAR: IOMMU enabled
+[    0.363959] DMAR: Host address width 39
+[    0.363960] DMAR: DRHD base: 0x000000fed90000 flags: 0x0
+[    0.363966] DMAR: dmar0: reg_base_addr fed90000 ver 4:0 cap 1c0000c40660462 ecap 29a00f0505e
+[    0.363968] DMAR: DRHD base: 0x000000fed91000 flags: 0x1
+[    0.363972] DMAR: dmar1: reg_base_addr fed91000 ver 5:0 cap d2008c40660462 ecap f050da
+[    0.363974] DMAR: RMRR base: 0x0000003e000000 end: 0x000000407fffff
+[    0.363979] DMAR-IR: IOAPIC id 2 under DRHD base  0xfed91000 IOMMU 1
+[    0.363980] DMAR-IR: HPET id 0 under DRHD base 0xfed91000
+[    0.363981] DMAR-IR: Queued invalidation will be enabled to support x2apic and Intr-remapping.
+[    0.365574] DMAR-IR: Enabled IRQ remapping in x2apic mode
+[    1.692872] pci 0000:00:02.0: DMAR: Skip IOMMU disabling for graphics
+[    1.772852] DMAR: No ATSR found
+[    1.772853] DMAR: No SATC found
+[    1.772854] DMAR: IOMMU feature fl1gp_support inconsistent
+[    1.772855] DMAR: IOMMU feature pgsel_inv inconsistent
+[    1.772856] DMAR: IOMMU feature nwfs inconsistent
+[    1.772857] DMAR: IOMMU feature dit inconsistent
+[    1.772857] DMAR: IOMMU feature sc_support inconsistent
+[    1.772858] DMAR: IOMMU feature dev_iotlb_support inconsistent
+[    1.772859] DMAR: dmar0: Using Queued invalidation
+[    1.772862] DMAR: dmar1: Using Queued invalidation
+[    1.773681] DMAR: Intel(R) Virtualization Technology for Directed I/O
+
+root@pve ~ $ ovs-vswitchd --version
+ovs-vswitchd (Open vSwitch) 3.1.0
+
+root@pve ~ $ devlink dev eswitch show pci/0000:01:00.0
+pci/0000:01:00.0: mode switchdev
+
+root@pve ~ $ ip link show enp1s0f0np0
+4: enp1s0f0np0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 8996 qdisc mq master ovs-system state UP mode DEFAULT group default qlen 1000
+    link/ether 6c:fe:54:40:c9:c0 brd ff:ff:ff:ff:ff:ff
+    vf 0     link/ether 0e:14:8f:ad:e2:88 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state enable, trust off
+    vf 1     link/ether 22:d9:5d:58:68:c5 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state enable, trust off
+    vf 2     link/ether fe:b7:34:c9:41:bc brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state enable, trust off
+    vf 3     link/ether 8e:df:f9:c6:1d:01 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state enable, trust off
+```
+
+### Run iperf3 and netperf test between 2 VMs with 1 VF each and see that the throughput is around 40Gbps which indicates that hw-offload is working as expected.
+
+![With hw-offload enabled, the iperf3 test between vm01 and vm02](./Pics/ReportIPerf-20260324-132052.png)
+
+![With hw-offload enabled, the netperf test between vm01 and vm02](./Pics/ReportNetperf-20260324-132903.png)
+
+### Run iperf3 and netperf with 4VMs / 4VFs - hw-offload = true
+
+```yaml
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000"}
+```
+
+- Results
+![hw-offload enabled](./Pics/ReportIPerfNetperf4VM_hwoffload-20260324-154758.png)
+
+### Run iperf3 and netperf with 4VMs / 4VFs - hw-offload = true + tc-policy=skip_hw
+
+```yaml
+root@pve ~ $ ovs-vsctl set Open_vSwitch . other_config:tc-policy=skip_hw
+root@pve ~ $ systemctl restart openvswitch-switch
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000", tc-policy=skip_hw
+```
+
+- Results
+![hw-offload enabled + tc-policy=skip_hw](./Pics/ReportIPerfNetperf4VM_hwoffload_skipHW-20260324-160600.png)
+
+### Run iperf3 and netperf with 4VMs / 4VFs - hw-offload = false
+
+```yaml
+root@pve ~ $ ovs-vsctl set Open_vSwitch . other_config:hw-offload=false
+root@pve ~ $ systemctl restart openvswitch-switch
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="false", max-idle="30000"}
+```
+
+- Results
+![hw-offload disabled](./Pics/ReportIPerfNetperf4VM_hwoffloadFALSE-20260324-155900.png)
 
