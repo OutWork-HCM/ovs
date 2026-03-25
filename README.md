@@ -95,3 +95,14 @@ If Offload performance is lower than expected:
 2.  Check for `in_hw` in `tc` rules: `tc -s filter show dev <REPRESENTOR> ingress`.
 3.  Ensure `iperf3` is running on the correct namespaces/VFs.
 4.  Monitor CPU usage with `htop` or `sar`. High CPU usage on the host usually means traffic is NOT offloaded.
+
+## Some useful tools
+- `ethtool -S <interface>`: View NIC statistics.
+- `ip link show <interface>`: Check interface status.
+- `devlink dev eswitch show <interface>`: Check eSwitch offload status.
+- `tc -s filter show dev <interface> ingress`: Check offload status of traffic rules.
+- `sar -u 1`: Monitor CPU usage in real-time.
+- `bmon -p <interface>`: Monitor bandwidth usage.
+- `nload -u M -t 500 <interface>`: Real-time bandwidth monitoring.
+
+

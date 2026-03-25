@@ -2203,7 +2203,6 @@ iface nic2 inet manual
 
 auto ovs_sriov
 iface ovs_sriov inet static
-    address 10.10.10.1/24
     ovs_type OVSBridge
     ovs_ports nic2
     ovs_mtu 8996

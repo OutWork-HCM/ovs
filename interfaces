@@ -1,28 +1,27 @@
 auto lo
 iface lo inet loopback
 
-iface nic0 inet manual
+iface enp3s0 inet manual
 
 auto vmbr0
 iface vmbr0 inet static
 	address 192.168.1.243/24
 	gateway 192.168.1.1
-	bridge-ports nic0
+	bridge-ports enp3s0
 	bridge-stp off
 	bridge-fd 0
 
-iface nic1 inet manual
+iface enp4s0 inet manual
 
-iface nic2 inet manual
+iface enp1s0f0np0 inet manual
 
 auto ovs_sriov
 iface ovs_sriov inet static
-    address 10.10.10.1/24
     ovs_type OVSBridge
-    ovs_ports nic2
+    ovs_ports enp1s0f0np0
     ovs_mtu 8996
 
-iface nic3 inet manual
+iface enp1s0f1np1 inet manual
 
 
 source /etc/network/interfaces.d/*
