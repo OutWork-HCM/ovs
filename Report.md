@@ -2436,3 +2436,127 @@ root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
 - Results
 ![hw-offload disabled](./Pics/ReportIPerfNetperf4VM_hwoffloadFALSE-20260324-155900.png)
 
+# 2026-03-25
+## Tuning to get better performance with hw-offload enabled
+
+We will use 2 VMs to test the performance tuning with hw-offload enabled. The tuning will be done on both Proxmox VE and inside the VMs.
+
+### Tuning on VMs (done on both vm03 and vm04)
+- set mtu to 8996 on the VF interface
+```yaml
+sudo ip link set enp6s16 mtu 8996
+```
+
+- Increase 'Ring Buffer' of the VF interface to 4096
+```yaml
+sudo ethtool -G enp6s16 rx 4096 tx 4096
+
+ovs@ovs-serv04:~$ ethtool -g enp6s16
+Ring parameters for enp6s16:
+Pre-set maximums:
+RX:                     4096
+RX Mini:                n/a
+RX Jumbo:               n/a
+TX:                     4096
+TX push buff len:       n/a
+Current hardware settings:
+RX:                     4096
+RX Mini:                n/a
+RX Jumbo:               n/a
+TX:                     4096
+RX Buf Len:             n/a
+CQE Size:               n/a
+TX Push:                off
+RX Push:                off
+TX push buff len:       n/a
+TCP data split:         n/a
+```
+
+- Increase "RSS Queues" to 8
+```yaml
+sudo ethtool -L enp6s16 combined 8
+```
+
+- On vm03 (client), run iperf3 with the following option
+```yaml
+ovs@ovs-serv03:/usr/local/bin$ taskset -c 0-7 iperf3 -c 10.10.10.14 -t 20 -P 8 -Z
+```
+
+- On vm04 (server), run iperf3 with the following option
+```yaml
+ovs@ovs-serv04:/usr/local/bin$ taskset -c 0-7 iperf3 -s -1
+```
+
+- Results
+```yaml
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-20.00  sec  31.6 GBytes  13.5 Gbits/sec    9             sender
+[  5]   0.00-20.00  sec  31.5 GBytes  13.5 Gbits/sec                  receiver
+[  7]   0.00-20.00  sec  32.4 GBytes  13.9 Gbits/sec    6             sender
+[  7]   0.00-20.00  sec  32.4 GBytes  13.9 Gbits/sec                  receiver
+[  9]   0.00-20.00  sec  16.0 GBytes  6.88 Gbits/sec    1             sender
+[  9]   0.00-20.00  sec  16.0 GBytes  6.88 Gbits/sec                  receiver
+[ 11]   0.00-20.00  sec  26.7 GBytes  11.4 Gbits/sec    2             sender
+[ 11]   0.00-20.00  sec  26.6 GBytes  11.4 Gbits/sec                  receiver
+[ 13]   0.00-20.00  sec  16.0 GBytes  6.87 Gbits/sec    7             sender
+[ 13]   0.00-20.00  sec  16.0 GBytes  6.87 Gbits/sec                  receiver
+[ 15]   0.00-20.00  sec  17.7 GBytes  7.60 Gbits/sec    1             sender
+[ 15]   0.00-20.00  sec  17.7 GBytes  7.60 Gbits/sec                  receiver
+[ 17]   0.00-20.00  sec  33.9 GBytes  14.6 Gbits/sec    1             sender
+[ 17]   0.00-20.00  sec  33.9 GBytes  14.6 Gbits/sec                  receiver
+[ 19]   0.00-20.00  sec  17.7 GBytes  7.59 Gbits/sec   10             sender
+[ 19]   0.00-20.00  sec  17.7 GBytes  7.58 Gbits/sec                  receiver
+[SUM]   0.00-20.00  sec   192 GBytes  82.4 Gbits/sec   37             sender
+[SUM]   0.00-20.00  sec   192 GBytes  82.4 Gbits/sec                  receiver
+
+iperf Done.
+```
+
+- Monitor some parameters on vm04
+```yaml
+ovs@ovs-serv04:~$ ethtool -S enp6s16 | grep -E "rx-"
+     rx-0.packets: 13074108
+     rx-0.bytes: 117792015871
+     rx-1.packets: 22483365
+     rx-1.bytes: 202573734274
+     rx-2.packets: 17941789
+     rx-2.bytes: 157570364414
+     rx-3.packets: 22231459
+     rx-3.bytes: 200304417139
+     rx-4.packets: 13484432
+     rx-4.bytes: 121493758230
+     rx-5.packets: 24493436
+     rx-5.bytes: 212456249633
+     rx-6.packets: 17941002
+     rx-6.bytes: 161587671003
+     rx-7.packets: 15581653
+     rx-7.bytes: 140390311739
+
+ovs@ovs-serv04:~$ ethtool -S enp6s16 | grep -iE "drop|error|discard|miss"
+     rx_discards: 12845900303
+     tx_discards: 0
+     tx_errors: 0
+
+ovs@ovs-serv04:~$ ethtool -S enp6s16 | grep -E "rx_packets|rx_bytes"
+     rx_bytes: 6540543082469
+
+ovs@ovs-serv04:~$ ethtool -l enp6s16
+Channel parameters for enp6s16:
+Pre-set maximums:
+RX:             n/a
+TX:             n/a
+Other:          1
+Combined:       16
+Current hardware settings:
+RX:             n/a
+TX:             n/a
+Other:          1
+Combined:       8
+```
+
+- Monitor drop packets in real-time on vm04 and see that there are some drops happening during the test which might be the reason for not getting full line rate of 100Gbps
+```yaml
+ovs@ovs-serv04:~$ watch -d -n 1 'ethtool -S enp6s16 | grep -iE "rx_.*(drop|discard|error|miss)"'
+```
+
+
