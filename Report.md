@@ -2410,7 +2410,7 @@ root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
 ```
 
 - Results
-![hw-offload enabled](./Pics/ReportIPerfNetperf4VM_hwoffload-20260324-154758.png)
+![hw-offload enabled](./Pics/ReportIPerfNetperf4VM_hwoffload-20260326-141236.png)
 
 ### Run iperf3 and netperf with 4VMs / 4VFs - hw-offload = true + tc-policy=skip_hw
 
