@@ -104,5 +104,22 @@ If Offload performance is lower than expected:
 - `sar -u 1`: Monitor CPU usage in real-time.
 - `bmon -p <interface>`: Monitor bandwidth usage.
 - `nload -u M -t 500 <interface>`: Real-time bandwidth monitoring.
+- `pidstat -p $(pgrep -d, kvm) 1`: Monitor KVM CPU usage in real-time.
+- `mpstat 1`: Monitor overall CPU usage in real-time.
+- Monitor KVM vs OVS CPU usage in real-time:
+```yaml
+CORES=32
+while true; do
+  kvm_raw=$(pidstat -p $(pgrep -d, kvm) 1 1 | awk '/ kvm$/ {sum += $8} END {print sum+0}')
+  
+  total=$(mpstat 1 2 | awk '/ all / {usage=100-$NF} END {print usage}')
+  
+  kvm=$(awk -v k="$kvm_raw" -v c="$CORES" 'BEGIN {print k/c}')
+  ovs=$(awk -v t="$total" -v k="$kvm" 'BEGIN {print t - k}')
+  
+  printf "KVM: %.2f%% | Total: %.2f%% | OVS+System: %.2f%%\n" "$kvm" "$total" "$ovs"
+done
+```
 
-
+## Some useful links
+- https://dev.to/sergelogvinov/proxmox-virtual-machine-optimization-deep-dive-mn9

@@ -29,4 +29,7 @@ root@pve /usr/local/bin $ ethtool -k enp1s0f0npf0vf0 | grep hw-tc
 hw-tc-offload: on
 ```
 
+- [ ] Check for any known issues with the Intel E810 NIC and hardware offload, especially related to interrupt handling and CPU load. For example, there are reports of high CPU usage on a single core due to ksoftirqd when using 100G network cards, which may be relevant:
+
+https://forum.proxmox.com/threads/100g-network-card-and-interrupt-handling-ksoftirqd-process-loads-a-single-cpu-core-at-100.167268/
 

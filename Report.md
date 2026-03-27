@@ -2559,4 +2559,138 @@ Combined:       8
 ovs@ovs-serv04:~$ watch -d -n 1 'ethtool -S enp6s16 | grep -iE "rx_.*(drop|discard|error|miss)"'
 ```
 
+# 2026-03-27
+## Investigate CPU usage in hw-offload=true/false
+- We built cpu_use.sh script to monitor CPU usage of ksoftirqd and kmv processes on Proxmox VE during the iperf3 test between 4 VMs.
+```bash
+#!/bin/bash
 
+# Header
+printf "%-12s %-12s %-12s\n" "OVS_CPU" "KVM_CPU" "IDLE_CPU"
+printf "%-12s %-12s %-12s\n" "------------" "------------" "------------"
+
+while true; do
+    # 1. Get initial CPU stats from /proc/stat
+    stat1=$(grep '^cpu ' /proc/stat)
+
+    # run pidstat to get CPU usage of ksoftirqd and kvm processes
+    data=$(pidstat -t 1 1 | grep -v "Average" | grep -v "UID")
+
+    stat2=$(grep '^cpu ' /proc/stat)
+
+    # 2. Calculate idle CPU percentage based on the difference between stat1 and stat2
+    idle_val=$(awk -v s1="$stat1" -v s2="$stat2" '
+    BEGIN {
+        split(s1, a); split(s2, b);
+
+        # Sum of all CPU time fields (user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice)
+        for (i=2; i<=11; i++) {
+            t1 += a[i];
+            t2 += b[i];
+        }
+
+        # Time spent in idle state is the 4th field (idle) + 5th field (iowait)
+        id1 = a[5] + a[6];
+        id2 = b[5] + b[6];
+
+        # Calculate idle percentage
+        printf "%.1f", (id2 - id1) * 100 / (t2 - t1)
+    }')
+
+    # 3. Sum up CPU usage for ksoftirqd and kvm processes from pidstat output
+    stats=$(echo "$data" | awk '
+    BEGIN { ovs_sum=0; kvm_sum=0 }
+    {
+        cpu_val = $9
+        if ($0 ~ /ksoftirqd/ && $0 ~ /\|__/) {
+            ovs_sum += cpu_val
+        }
+        if (($0 ~ /kvm/ || $0 ~ /KVM/) && $0 ~ /\|__/) {
+            kvm_sum += cpu_val
+        }
+    }
+    END { printf "%.2f %.2f", ovs_sum, kvm_sum }
+    ')
+
+    ovs_total=$(echo $stats | cut -d' ' -f1)
+    kvm_total=$(echo $stats | cut -d' ' -f2)
+
+    # 4. Print the results in a formatted way
+    printf "%-12s %-12s %-12s\n" "$ovs_total" "$kvm_total" "$idle_val%"
+done
+```
+
+- Run the script during the iperf3 test and see that when hw-offload is enabled, the CPU usage of ksoftirqd is very low (around 1-2%) and most of the traffic is being processed by the hardware. When hw-offload is disabled, the CPU usage of ksoftirqd is very high (>100%) which indicates that all the traffic is being processed by the CPU
+
+### hw-offload = true
+```yaml
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="true", max-idle="30000"}
+```
+
+```yaml
+root@pve ~ $ ./cpu_use.sh
+OVS_CPU      KVM_CPU      IDLE_CPU    
+------------ ------------ ------------
+0.00         3.92         99.7%       
+0.00         0.00         99.6%       
+0.00         373.77       79.4%       
+0.00         517.64       72.4%       
+0.00         771.55       61.3%       
+0.00         806.85       60.1%       
+0.00         778.66       61.3%       
+0.00         841.77       58.5%       
+0.00         845.61       58.8%       
+0.00         833.66       58.8%       
+0.00         894.11       56.7%       
+0.00         858.26       57.6%       
+0.00         720.38       63.2%       
+0.00         671.84       65.7%       
+0.00         643.68       66.8%       
+0.00         699.04       64.6%       
+0.00         681.56       64.9%       
+0.00         700.97       64.2%       
+0.00         690.20       65.0%       
+0.00         685.27       65.0%       
+0.00         692.15       64.9%
+```
+
+### hw-offload = false
+```yaml
+root@pve ~ $ ovs-vsctl set Open_vSwitch . other_config:hw-offload=false
+root@pve ~ $ systemctl restart openvswitch-switch
+root@pve ~ $ ovs-vsctl get Open_vSwitch . other_config
+{hw-offload="false", max-idle="30000"}
+```
+
+```yaml
+root@pve ~ $ ./cpu_use.sh
+OVS_CPU      KVM_CPU      IDLE_CPU    
+------------ ------------ ------------
+0.00         0.00         99.6%       
+0.00         0.00         99.8%       
+0.00         1.96         99.7%       
+54.90        87.24        93.1%       
+100.98       166.64       87.2%       
+100.00       277.66       80.9%       
+99.03        363.09       76.9%       
+100.00       365.68       77.2%       
+99.03        358.25       77.2%       
+99.03        359.22       77.2%       
+100.00       360.19       77.0%       
+100.00       354.37       76.9%       
+100.00       366.66       76.7%       
+100.00       362.74       77.1%       
+100.98       358.82       77.1%       
+99.03        366.02       77.0%       
+100.00       361.18       76.9%       
+100.00       415.67       74.5%       
+100.00       470.59       71.5%       
+100.00       464.08       71.8%       
+100.98       477.45       71.6%       
+100.00       474.75       71.4%       
+100.97       471.86       71.7%
+```
+
+- TODO: Continue to investigate the reason why ksoftirqd only stack on CPU 0 and not distributed to other CPUs when hw-offload is disabled. We found the same issue on proxomx forum and don't see any solution for this issue yet. (see link below)
+[100G network card and interrupt handling (ksoftirqd process loads a single CPU core at 100%)](https://forum.proxmox.com/threads/100g-network-card-and-interrupt-handling-ksoftirqd-process-loads-a-single-cpu-core-at-100.167268/)
