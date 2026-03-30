@@ -2693,4 +2693,9 @@ OVS_CPU      KVM_CPU      IDLE_CPU
 ```
 
 - TODO: Continue to investigate the reason why ksoftirqd only stack on CPU 0 and not distributed to other CPUs when hw-offload is disabled. We found the same issue on proxomx forum and don't see any solution for this issue yet. (see link below)
+
 [100G network card and interrupt handling (ksoftirqd process loads a single CPU core at 100%)](https://forum.proxmox.com/threads/100g-network-card-and-interrupt-handling-ksoftirqd-process-loads-a-single-cpu-core-at-100.167268/)
+
+You can put this string to google search "proxmox sr iov ksoftirqd cpu core 0" and find some useful information about this issue, something like that
+
+[Proxmox Virtual Machine optimization - Deep Dive](https://dev.to/sergelogvinov/proxmox-virtual-machine-optimization-deep-dive-mn9#solution)
