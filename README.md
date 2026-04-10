@@ -105,7 +105,10 @@ If Offload performance is lower than expected:
 - `bmon -p <interface>`: Monitor bandwidth usage.
 - `nload -u M -t 500 <interface>`: Real-time bandwidth monitoring.
 - `pidstat -p $(pgrep -d, kvm) 1`: Monitor KVM CPU usage in real-time.
+- `pidstat 1`: Monitor overall CPU usage in real-time.
 - `mpstat 1`: Monitor overall CPU usage in real-time.
+- `irqtop`: Monitor interrupt handling in real-time.
+- `cat /proc/interrupts | grep ice`: Check interrupts for Intel E810.
 - Monitor KVM vs OVS CPU usage in real-time:
 ```yaml
 CORES=32

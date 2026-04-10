@@ -2692,6 +2692,152 @@ OVS_CPU      KVM_CPU      IDLE_CPU
 100.97       471.86       71.7%
 ```
 
+# 2026-04-10
+## Technical Report: VF Queue allocation and Performance analysis
+
+**NOTE**: Using default configuration (hw_offload=true) with 2 VMs and 2 VFs
+**Subject**: Virtual Function (VF) Performance using iavf driver on Proxmox VE with OVS and SR-IOV
+**Objective**: To demonstrate taht the VF dynamically and correctly allocates hardware queues and CPU interrupts based on traffice demand (Single-stream vs. Multi-stream)
+
+### 1. Executive Summary
+Based on the analyzed data, the system exhibits highly efficient scaling behavior:
+- Single-stream (-P 1): Traffice is consolidated into a single queue.
+- Multi-stream (-P 4): The system successfully scales arcoss 4 hardware queues (TxRx-0 to TxRx-3). This triggers simultaneous processing across 4 CPU cores.
+
+### 2. Detailed Scenario analysis
+#### Single-stream test (-P 1)
+```yaml
+ovs@ovs-serv01:~$ iperf3 -c 10.10.10.12 -t 30 -P 1                                                                                                                                                                                 
+Connecting to host 10.10.10.12, port 5201                                                                                                                                
+[  5] local 10.10.10.11 port 51094 connected to 10.10.10.12 port 5201                                                                                                                                            
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd                                                                                                                                                                   
+[  5]  16.00-17.00  sec  5.01 GBytes  43.0 Gbits/sec  1267    994 KBytes                                                                                                                                                                     
+[  5]  27.00-28.00  sec  5.07 GBytes  43.5 Gbits/sec  1452    880 KBytes                                                                                                                                                                            
+[  5]  28.00-29.00  sec  5.05 GBytes  43.4 Gbits/sec  2510   1017 KBytes                                                                                                                                                       
+[  5]  29.00-30.00  sec  5.04 GBytes  43.3 Gbits/sec  1894    939 KBytes                                                                                                                                                                              
+- - - - - - - - - - - - - - - - - - - - - - - - -                                                                                                                                                                                               
+[ ID] Interval           Transfer     Bitrate         Retr                                                                                                                                                                              
+[  5]   0.00-30.00  sec   151 GBytes  43.3 Gbits/sec  59791       sender                                                                                                                                                                           
+[  5]   0.00-30.00  sec   151 GBytes  43.3 Gbits/sec              receiver                                                                                                                                                                      
+iperf Done.
+
+ovs@ovs-serv01:~$ cat /proc/interrupts | grep enp6s16
+ 37:         30          0          0          0  PCI-MSIX-0000:06:10.0   1-edge      iavf-enp6s16-TxRx-0
+ 38:          0    1751953          0          0  PCI-MSIX-0000:06:10.0   2-edge      iavf-enp6s16-TxRx-1
+ 39:          0          0        631          0  PCI-MSIX-0000:06:10.0   3-edge      iavf-enp6s16-TxRx-2
+ 40:          0          0          0        291  PCI-MSIX-0000:06:10.0   4-edge      iavf-enp6s16-TxRx-3
+
+ovs@ovs-serv01:~$ ethtool -S enp6s16                                                                                                                                                                                                         
+NIC statistics:                                                                                                                                                                                                                          
+     rx_bytes: 1430524895                                                                                                                                                                                                             
+     rx_unicast: 21653804                                                                                                                                                                                                             
+     rx_multicast: 109                                                                                                                                                                                                                     
+     rx_broadcast: 3                                                                                                                                                                             
+     rx_discards: 0                                                                                                                                                           
+     rx_unknown_protocol: 0                                                                                                                                                                                                          
+     tx_bytes: 2176361011737                                                                                                                                                                                                    
+     tx_unicast: 1438386723                                                                                                                                                                  
+     tx_multicast: 31                                                                                                                                                                                                            
+     tx_broadcast: 3                                                                                                                                                                                            
+     tx_discards: 0                                                                                                                                                                                                                      
+     tx_errors: 0                                                                                                                                                                                                       
+     tx-0.packets: 4                                                                                                                                                                                               
+     tx-0.bytes: 360                                                                                                          
+     rx-0.packets: 1                                                                                                          
+     rx-0.bytes: 60                                                                                                           
+     tx-1.packets: 4                                                                                                          
+     tx-1.bytes: 286                                                                                                          
+     rx-1.packets: 0                                                                                                          
+     rx-1.bytes: 0                                                                                                            
+     tx-2.packets: 3                                                                                                          
+     tx-2.bytes: 260                                                                                                          
+     rx-2.packets: 25                                                                                                         
+     rx-2.bytes: 7646                                                                                                         
+     tx-3.packets: 22                                                                                                         
+     tx-3.bytes: 7115                                                                                                         
+     rx-3.packets: 0                                                                                                          
+     rx-3.bytes: 0
+```
+
+#### Multi-stream test (-P 4)
+```yaml
+ovs@ovs-serv01:~$ iperf3 -c 10.10.10.12 -t 30 -P 4              
+Connecting to host 10.10.10.12, port 5201
+[  5] local 10.10.10.11 port 57856 connected to 10.10.10.12 port 5201
+[  7] local 10.10.10.11 port 57858 connected to 10.10.10.12 port 5201
+[  9] local 10.10.10.11 port 57872 connected to 10.10.10.12 port 5201
+[ 11] local 10.10.10.11 port 57878 connected to 10.10.10.12 port 5201
+[ ID] Interval           Transfer     Bitrate         Retr  Cwnd
+[  5]   0.00-1.00   sec  1.49 GBytes  12.8 Gbits/sec    0   1.44 MBytes       
+[  7]   0.00-1.00   sec  1.54 GBytes  13.2 Gbits/sec    0   1.36 MBytes       
+[  9]   0.00-1.00   sec  1.47 GBytes  12.6 Gbits/sec  625    952 KBytes       
+[ 11]   0.00-1.00   sec  1.42 GBytes  12.2 Gbits/sec  486   1.02 MBytes       
+[SUM]   0.00-1.00   sec  5.92 GBytes  50.8 Gbits/sec  1111              
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[  5]   1.00-2.00   sec  1.49 GBytes  12.8 Gbits/sec    0   1.59 MBytes       
+[  7]   1.00-2.00   sec  1.49 GBytes  12.8 Gbits/sec    0   1.36 MBytes       
+[  9]   1.00-2.00   sec  1.47 GBytes  12.6 Gbits/sec    0   1.25 MBytes       
+[ 11]   1.00-2.00   sec  1.47 GBytes  12.6 Gbits/sec    0   1.31 MBytes       
+[SUM]   1.00-2.00   sec  5.91 GBytes  50.8 Gbits/sec    0
+
+[  5]  29.00-30.00  sec  1.51 GBytes  12.9 Gbits/sec    0   1.52 MBytes       
+[  7]  29.00-30.00  sec  1.49 GBytes  12.8 Gbits/sec    0   1.52 MBytes       
+[  9]  29.00-30.00  sec  1.44 GBytes  12.4 Gbits/sec    0   1.33 MBytes       
+[ 11]  29.00-30.00  sec  1.48 GBytes  12.7 Gbits/sec    0   1.31 MBytes       
+[SUM]  29.00-30.00  sec  5.92 GBytes  50.8 Gbits/sec    0             
+- - - - - - - - - - - - - - - - - - - - - - - - -
+[ ID] Interval           Transfer     Bitrate         Retr
+[  5]   0.00-30.00  sec  44.4 GBytes  12.7 Gbits/sec  1188             sender
+[  5]   0.00-30.00  sec  44.4 GBytes  12.7 Gbits/sec                  receiver
+[  7]   0.00-30.00  sec  46.8 GBytes  13.4 Gbits/sec  2046             sender
+[  7]   0.00-30.00  sec  46.8 GBytes  13.4 Gbits/sec                  receiver
+[  9]   0.00-30.00  sec  42.3 GBytes  12.1 Gbits/sec  6383             sender
+[  9]   0.00-30.00  sec  42.3 GBytes  12.1 Gbits/sec                  receiver
+[ 11]   0.00-30.00  sec  44.2 GBytes  12.7 Gbits/sec  6772             sender
+[ 11]   0.00-30.00  sec  44.2 GBytes  12.6 Gbits/sec                  receiver
+[SUM]   0.00-30.00  sec   178 GBytes  50.9 Gbits/sec  16389             sender
+[SUM]   0.00-30.00  sec   178 GBytes  50.9 Gbits/sec                  receiver
+
+iperf Done.
+
+ovs@ovs-serv01:~$ cat /proc/interrupts | grep enp6s16
+ 37:    1014822          0          0          0  PCI-MSIX-0000:06:10.0   1-edge      iavf-enp6s16-TxRx-0
+ 38:          0    2551456          0          0  PCI-MSIX-0000:06:10.0   2-edge      iavf-enp6s16-TxRx-1
+ 39:          0          0    1068454          0  PCI-MSIX-0000:06:10.0   3-edge      iavf-enp6s16-TxRx-2
+ 40:          0          0          0     847773  PCI-MSIX-0000:06:10.0   4-edge      iavf-enp6s16-TxRx-3
+
+ovs@ovs-serv01:~$ ethtool -S enp6s16
+NIC statistics:
+     rx_bytes: 1727184898
+     rx_unicast: 26143049
+     rx_multicast: 110
+     rx_broadcast: 3
+     rx_discards: 0
+     rx_unknown_protocol: 0
+     tx_bytes: 2545694133904
+     tx_unicast: 1682340956
+     tx_multicast: 38
+     tx_broadcast: 4
+     tx_discards: 0
+     tx_errors: 0
+     tx-0.packets: 64303698
+     tx-0.bytes: 97351811209
+     rx-0.packets: 1602342
+     rx-0.bytes: 105776834
+     tx-1.packets: 112139512
+     tx-1.bytes: 169775915429
+     rx-1.packets: 2038034
+     rx-1.bytes: 134816714
+     tx-2.packets: 67510449
+     tx-2.bytes: 102205315956
+     rx-2.packets: 807
+     rx-2.bytes: 75254
+     tx-3.packets: 615
+     tx-3.bytes: 87306
+     rx-3.packets: 848089
+     rx-3.bytes: 55998907
+```
+
 - TODO: Continue to investigate the reason why ksoftirqd only stack on CPU 0 and not distributed to other CPUs when hw-offload is disabled. We found the same issue on proxomx forum and don't see any solution for this issue yet. (see link below)
 
 [100G network card and interrupt handling (ksoftirqd process loads a single CPU core at 100%)](https://forum.proxmox.com/threads/100g-network-card-and-interrupt-handling-ksoftirqd-process-loads-a-single-cpu-core-at-100.167268/)
