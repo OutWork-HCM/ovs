@@ -2838,6 +2838,43 @@ NIC statistics:
      rx-3.bytes: 55998907
 ```
 
+# 2026-04-21
+## BÁO CÁO ĐÁNH GIÁ: HỆ SINH THÁI ẢO HÓA PROXMOX VE & PDM 1.0 TRONG DOANH NGHIỆP
+### 1. Bối cảnh hạ tầng
+VMware vSphere + vCenter là hệ thống quản trị mạnh mẽ, ổn định và tối ưu cho tự động hóa cao (như DRS - Distributed Resource Scheduler, FT - Fault Tolerance). Tuy nhiên, Proxmox VE kết hợp Proxmox Datacenter Manager (PDM) mang lại sự linh hoạt tối đa nhờ mã nguồn mở, cho phép doanh nghiệp tự do can thiệp sâu mà không bị ràng buộc bởi license.
+
+### 2. Điểm nổi bật của PDM 1.0
+PDM 1.0 tập trung giải quyết các nhu cầu quản trị cốt lõi thay vì sao chép toàn bộ vCenter:
+
+- Quản trị tập trung (“Single pane of glass”) cho nhiều cụm Proxmox và Proxmox Backup Server.
+- Live migration workload giữa các datacenter, hỗ trợ bảo trì không downtime.
+- Custom Views giúp mỗi nhóm (Helpdesk, SysAdmin…) chỉ thấy thông tin cần thiết, giảm nhiễu thông tin.
+
+### 3. Lộ trình phát triển
+Proxmox cam kết phát triển dài hạn cho PDM với các hướng chính:
+
+- Tăng cường quản lý firewall (SDN), backup phức tạp và kiểm soát tài nguyên guest trực tiếp từ PDM.
+- Cải thiện độ tin cậy với cơ chế active-standby và Disaster Recovery từ xa.
+- Hỗ trợ quy mô lớn (đã thử nghiệm trên 5.000 remote nodes). [Note 1](https://forum.proxmox.com/threads/proxmox-datacenter-manager-first-alpha-release.159323)
+
+### 4. Khi nào nên cân nhắc chuyển đổi sang Proxmox + PDM?
+Proxmox là lựa chọn chiến lược phù hợp khi doanh nghiệp:
+
+- Muốn loại bỏ vendor lock-in, tăng tính tự chủ.
+- Cần hiện đại hóa hạ tầng, kết hợp tốt cả VM và Container (LXC).
+- Muốn tối ưu chi phí vận hành, giảm phụ thuộc vào chi phí bản quyền phần mềm.
+
+### 5. Kết luận
+VMware vSphere vẫn rất mạnh cho các hệ thống phức tạp đã tối ưu lâu năm. Tuy nhiên, nếu doanh nghiệp tìm kiếm nền tảng hiện đại, minh bạch, linh hoạt và có lộ trình phát triển rõ ràng, Proxmox VE kết hợp PDM 1.0 là giải pháp thay thế chiến lược đáng cân nhắc.
+
+### 6. Link tham khảo
+https://www.hornetsecurity.com/en/blog/proxmox-vs-vmware/
+https://www.synextra.co.uk/knowledge-base/proxmox-vs-vmware/
+https://readyspace.com.sg/proxmox-ha-vs-vmware-drs-ft/
+https://pdm.proxmox.com/docs/roadmap.html
+https://www.youtube.com/watch?v=vJfcjbnjEG0
+
+
 - TODO: Continue to investigate the reason why ksoftirqd only stack on CPU 0 and not distributed to other CPUs when hw-offload is disabled. We found the same issue on proxomx forum and don't see any solution for this issue yet. (see link below)
 
 [100G network card and interrupt handling (ksoftirqd process loads a single CPU core at 100%)](https://forum.proxmox.com/threads/100g-network-card-and-interrupt-handling-ksoftirqd-process-loads-a-single-cpu-core-at-100.167268/)
